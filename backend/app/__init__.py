@@ -39,8 +39,9 @@ def create_app(config_name: str | None = None) -> Flask:
                 "script-src": ["'self'", "cdn.jsdelivr.net", "checkout.razorpay.com", "cdnjs.cloudflare.com", "'unsafe-inline'"],
                 "style-src": ["'self'", "fonts.googleapis.com", "cdn.jsdelivr.net", "'unsafe-inline'"],
                 "font-src": ["'self'", "fonts.gstatic.com"],
-                "img-src": ["'self'", "data:"],
-                "frame-src": ["api.razorpay.com", "www.google.com"],
+                "img-src": ["'self'", "data:", "https://*.razorpay.com"],
+                "frame-src": ["https://api.razorpay.com", "https://*.razorpay.com", "https://www.google.com"],
+                "connect-src": ["'self'", "https://*.razorpay.com"],
             },
             force_https=False,           # Vercel enforces HTTPS at the edge
             strict_transport_security=True,
