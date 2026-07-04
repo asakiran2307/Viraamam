@@ -31,6 +31,8 @@ class BaseConfig:
     CAFE_NAME = os.environ.get("CAFE_NAME", "Viraamam")
     # Rate limiter: use memory:// if Redis not configured (safe for serverless)
     RATELIMIT_STORAGE_URI = os.environ.get("REDIS_URL", "memory://")
+    TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "")
+    TELEGRAM_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID", "")
 
 
 class DevelopmentConfig(BaseConfig):

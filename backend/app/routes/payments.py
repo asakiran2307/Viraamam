@@ -10,9 +10,17 @@ from ..models.payment import Payment
 from ..services.order_service import create_order
 from ..services.payment_service import verify_razorpay_signature, verify_webhook_signature
 from ..services.stock_service import decrement_stock_for_order
+from ..services.telegram_service import send_telegram_notification
 
 payments_bp = Blueprint("payments", __name__)
 
+
+def _notify_admin(order):
+    try:
+        items_summary = "\n".join([f"- {oi.quantity}x {oi.item.name}" for oi in order.order_items])
+        send_telegram_notification(order.id, float(order.total_amount), items_summary)
+    except Exception as e:
+        current_app.logger.error(f"Failed to format/send telegram notification: {e}")
 
 @payments_bp.route("/create-order", methods=["POST"])
 @login_required
@@ -72,6 +80,8 @@ def verify_payment():
     order.razorpay_payment_id = rz_payment_id
     order.status = "paid"
     db.session.commit()
+    
+    _notify_admin(order)
 
     if not decrement_stock_for_order(order.id):
         return jsonify(error="Stock issue — contact support"), 500
@@ -118,6 +128,8 @@ def razorpay_webhook():
     order.status = "paid"
     order.razorpay_payment_id = rz_payment_id
     db.session.commit()
+    
+    _notify_admin(order)
 
     if not decrement_stock_for_order(order.id):
         current_app.logger.error(f"Stock decrement failed for order {order.id} from webhook")
