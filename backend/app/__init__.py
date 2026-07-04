@@ -4,7 +4,7 @@ import click
 from flask import Flask
 from .config import config_by_name
 from .extensions import db, migrate, login_manager, csrf, limiter
-from .models import user, category, item, advertisement, ambience, order, order_item, payment  # noqa: F401
+from .models import user, category, item, advertisement, ambience, order, order_item, payment, cart_item  # noqa: F401
 from .utils.errors import register_error_handlers
 
 
@@ -67,6 +67,12 @@ def create_app(config_name: str | None = None) -> Flask:
     app.register_blueprint(ambience_bp, url_prefix="/ambience")
 
     register_error_handlers(app)
+
+    @app.before_request
+    def run_cart_cleanup():
+        # Clean up any expired carts in the database before processing the request
+        from .services.cart_service import cleanup_expired_carts
+        cleanup_expired_carts()
 
     # ── Jinja2 globals — available in every template ──────────────────────
     from datetime import date as _date, datetime as _datetime

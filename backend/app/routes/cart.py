@@ -1,33 +1,26 @@
-"""Cart routes — server-side cart stored in session."""
-from flask import Blueprint, request, jsonify, session
+"""Cart routes — database-backed cart with stock reservation."""
+from flask import Blueprint, request, jsonify
 from flask_login import login_required, current_user
+from ..extensions import db
 from ..models.item import Item
+from ..models.cart_item import CartItem
+from ..repositories import ItemRepo
 
 cart_bp = Blueprint("cart", __name__)
-
-
-def get_cart() -> dict:
-    return session.get("cart", {})
-
-
-def save_cart(cart: dict):
-    session["cart"] = cart
-    session.modified = True
 
 
 @cart_bp.route("/", methods=["GET"])
 @login_required
 def view_cart():
     from flask import render_template
-    cart = get_cart()
+    cart_items = CartItem.query.filter_by(user_id=current_user.id).all()
     items_in_cart = []
     total = 0
-    for item_id_str, qty in cart.items():
-        item = Item.query.filter_by(id=int(item_id_str), is_active=True).first()
-        if item:
-            subtotal = float(item.price) * qty
+    for ci in cart_items:
+        if not ci.is_expired:
+            subtotal = float(ci.item.price) * ci.quantity
             total += subtotal
-            items_in_cart.append({"item": item, "qty": qty, "subtotal": subtotal})
+            items_in_cart.append({"item": ci.item, "qty": ci.quantity, "subtotal": subtotal})
     return render_template("cart.html", cart_items=items_in_cart, total=total)
 
 
@@ -43,33 +36,66 @@ def add():
     item = Item.query.filter_by(id=item_id, is_active=True).first()
     if not item:
         return jsonify(success=False, message="Item not available"), 404
-    if item.stock_quantity == 0:
+
+    # Decrement stock immediately (reservation)
+    rows_updated = ItemRepo.decrement_stock_atomic(item_id, qty)
+    if rows_updated == 0:
         return jsonify(success=False, message="Out of stock"), 400
 
-    cart = get_cart()
-    current_qty = int(cart.get(str(item_id), 0))
-    new_qty = min(current_qty + qty, item.stock_quantity)
-    cart[str(item_id)] = new_qty
-    save_cart(cart)
-    cart_count = sum(cart.values())
+    ci = CartItem.query.filter_by(user_id=current_user.id, item_id=item_id).first()
+    if ci:
+        ci.quantity += qty
+    else:
+        ci = CartItem(user_id=current_user.id, item_id=item_id, quantity=qty)
+        db.session.add(ci)
+        
+    # Reset expiration for the entire cart
+    all_ci = CartItem.query.filter_by(user_id=current_user.id).all()
+    for c in all_ci:
+        c.reset_expiration()
+        
+    db.session.commit()
+    
+    # Calculate count
+    cart_count = sum([c.quantity for c in CartItem.query.filter_by(user_id=current_user.id).all()])
     return jsonify(success=True, cart_count=cart_count, message=f"Added {item.name} to cart!")
 
 
 @cart_bp.route("/update", methods=["POST"])
 @login_required
 def update():
+    """Update quantity and restore/deduct difference in stock."""
     data = request.get_json() or {}
-    item_id = str(int(data.get("item_id", 0)))
-    qty = int(data.get("qty", 0))
-    cart = get_cart()
-    if qty <= 0:
-        cart.pop(item_id, None)
-    else:
-        item = Item.query.filter_by(id=int(item_id), is_active=True).first()
-        if not item:
-            return jsonify(success=False), 404
-        cart[item_id] = min(qty, item.stock_quantity)
-    save_cart(cart)
+    item_id = int(data.get("item_id", 0))
+    new_qty = int(data.get("qty", 0))
+    
+    ci = CartItem.query.filter_by(user_id=current_user.id, item_id=item_id).first()
+    if not ci:
+        return jsonify(success=False), 404
+        
+    diff = new_qty - ci.quantity
+    
+    if new_qty <= 0:
+        # Restore stock and delete
+        Item.query.filter_by(id=item_id).update({"stock_quantity": Item.stock_quantity + ci.quantity})
+        db.session.delete(ci)
+    elif diff > 0:
+        # Trying to add more
+        rows_updated = ItemRepo.decrement_stock_atomic(item_id, diff)
+        if rows_updated == 0:
+            return jsonify(success=False, message="Not enough stock"), 400
+        ci.quantity = new_qty
+    elif diff < 0:
+        # Reducing quantity, restore stock
+        Item.query.filter_by(id=item_id).update({"stock_quantity": Item.stock_quantity + abs(diff)})
+        ci.quantity = new_qty
+        
+    # Reset expiration
+    all_ci = CartItem.query.filter_by(user_id=current_user.id).all()
+    for c in all_ci:
+        c.reset_expiration()
+        
+    db.session.commit()
     return jsonify(success=True)
 
 
@@ -77,14 +103,19 @@ def update():
 @login_required
 def remove():
     data = request.get_json() or {}
-    item_id = str(int(data.get("item_id", 0)))
-    cart = get_cart()
-    cart.pop(item_id, None)
-    save_cart(cart)
+    item_id = int(data.get("item_id", 0))
+    ci = CartItem.query.filter_by(user_id=current_user.id, item_id=item_id).first()
+    if ci:
+        # Restore stock
+        Item.query.filter_by(id=item_id).update({"stock_quantity": Item.stock_quantity + ci.quantity})
+        db.session.delete(ci)
+        db.session.commit()
     return jsonify(success=True)
 
 
 @cart_bp.route("/count", methods=["GET"])
 def count():
-    cart = get_cart()
-    return jsonify(count=sum(cart.values()))
+    if not current_user.is_authenticated:
+        return jsonify(count=0)
+    cart_count = sum([c.quantity for c in CartItem.query.filter_by(user_id=current_user.id).all() if not c.is_expired])
+    return jsonify(count=cart_count)

@@ -7,8 +7,9 @@ from .ambience import AmbiencePhoto
 from .order import Order
 from .order_item import OrderItem
 from .payment import Payment
+from .cart_item import CartItem
 
 __all__ = [
     "User", "Category", "Item", "Advertisement",
-    "AmbiencePhoto", "Order", "OrderItem", "Payment",
+    "AmbiencePhoto", "Order", "OrderItem", "Payment", "CartItem",
 ]
