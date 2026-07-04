@@ -4,6 +4,8 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="csrf-token" content="{{ csrf_token() }}" />
+  <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='images/favicon.ico') }}">
+  <link rel="apple-touch-icon" href="{{ url_for('static', filename='images/favicon.ico') }}">
   <title>{% block title %}Viraamam Cafe{% endblock %}</title>
   <meta name="description" content="{% block meta_desc %}Viraamam — where every sip tells a story. Order artisan coffee, fresh pastries, and handcrafted meals online.{% endblock %}" />
 
