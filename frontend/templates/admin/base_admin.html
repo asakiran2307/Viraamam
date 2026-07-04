@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="csrf-token" content="{{ csrf_token() }}" />
+  <title>{% block title %}Admin — Viraamam{% endblock %}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}" />
+  <style>
+    body { background: #f4f0eb; }
+    .admin-layout { display: flex; min-height: 100vh; }
+  </style>
+  {% block extra_head %}{% endblock %}
+</head>
+<body>
+
+<!-- ── Sidebar Overlay (mobile) ─────────────────── -->
+<div id="sidebar-overlay" style="position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:499;opacity:0;pointer-events:none;transition:opacity 0.3s ease;"></div>
+
+<!-- ── Sidebar ─────────────────────────────────── -->
+<aside class="admin-sidebar" id="admin-sidebar" role="navigation" aria-label="Admin navigation">
+  <div class="admin-sidebar-logo">
+    ☕ Viraama<span>m</span>
+    <div style="font-size:0.7rem;color:var(--color-brown-500);font-weight:400;font-family:var(--font-body);margin-top:0.2rem;">Admin Panel</div>
+  </div>
+
+  <nav class="admin-nav">
+    <div class="admin-nav-section">Main</div>
+    <a href="{{ url_for('admin.dashboard') }}" class="admin-nav-link {% if request.endpoint == 'admin.dashboard' %}active{% endif %}">
+      <span class="icon">📊</span> Dashboard
+    </a>
+    <a href="{{ url_for('admin.orders') }}" class="admin-nav-link {% if request.endpoint == 'admin.orders' %}active{% endif %}">
+      <span class="icon">📦</span> Orders
+    </a>
+
+    <div class="admin-nav-section">Catalog</div>
+    <a href="{{ url_for('admin.items') }}" class="admin-nav-link {% if 'items' in (request.endpoint or '') %}active{% endif %}">
+      <span class="icon">☕</span> Menu Items
+    </a>
+    <a href="{{ url_for('admin.categories') }}" class="admin-nav-link {% if 'categories' in (request.endpoint or '') %}active{% endif %}">
+      <span class="icon">🏷️</span> Categories
+    </a>
+
+    <div class="admin-nav-section">Content</div>
+    <a href="{{ url_for('admin.advertisements') }}" class="admin-nav-link {% if 'advertisement' in (request.endpoint or '') %}active{% endif %}">
+      <span class="icon">📢</span> Advertisements
+    </a>
+    <a href="{{ url_for('admin.ambience_admin') }}" class="admin-nav-link {% if 'ambience' in (request.endpoint or '') %}active{% endif %}">
+      <span class="icon">📷</span> Ambience Photos
+    </a>
+
+    <div class="admin-nav-section">Account</div>
+    <a href="{{ url_for('index') }}" class="admin-nav-link">
+      <span class="icon">🌐</span> View Site
+    </a>
+    <a href="{{ url_for('auth.logout') }}" class="admin-nav-link">
+      <span class="icon">🚪</span> Logout
+    </a>
+  </nav>
+
+  <div style="padding:1rem 1.5rem;font-size:0.78rem;color:var(--color-brown-600);border-top:1px solid rgba(212,98,42,0.15);">
+    Logged in as<br>
+    <strong style="color:var(--color-cream-300);">{{ current_user.name }}</strong>
+  </div>
+</aside>
+
+<!-- ── Main ────────────────────────────────────── -->
+<div class="admin-main">
+  <!-- Topbar -->
+  <div class="admin-topbar">
+    <button id="sidebar-toggler" style="background:none;border:none;cursor:pointer;font-size:1.3rem;color:var(--color-brown-700);" aria-label="Toggle sidebar">☰</button>
+    <div style="display:flex;align-items:center;gap:1rem;">
+      <span style="font-size:0.88rem;color:var(--color-brown-600);">Welcome, {{ current_user.name }}</span>
+      <a href="{{ url_for('index') }}" class="btn btn-ghost btn-sm">🌐 View Site</a>
+    </div>
+  </div>
+
+  <!-- Flash Messages -->
+  {% with messages = get_flashed_messages(with_categories=true) %}
+  {% if messages %}
+  <div style="padding:0 2rem;padding-top:1rem;">
+    {% for category, message in messages %}
+    <div class="flash {{ category }}" style="position:static;max-width:100%;margin-bottom:0.5rem;">{{ message }}</div>
+    {% endfor %}
+  </div>
+  {% endif %}
+  {% endwith %}
+
+  <!-- Page Content -->
+  <div class="admin-page">
+    {% block content %}{% endblock %}
+  </div>
+</div>
+
+<!-- Toast Container -->
+<div class="toast-container" id="toast-container"></div>
+
+<!-- Scripts -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js" defer></script>
+<script src="{{ url_for('static', filename='js/admin.js') }}"></script>
+{% block extra_scripts %}{% endblock %}
+
+<script>
+// Auto-dismiss flash messages
+document.querySelectorAll('.flash').forEach(el => {
+  setTimeout(() => { el.style.opacity = '0'; el.style.transition = 'opacity 0.5s'; setTimeout(() => el.remove(), 500); }, 5000);
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,73 @@
+{% extends "admin/base_admin.html" %}
+{% block title %}Categories — Viraamam Admin{% endblock %}
+
+{% block content %}
+<h1 class="admin-page-title">Categories</h1>
+<p class="admin-page-subtitle">Organize your menu items into categories.</p>
+
+<div style="display:grid;grid-template-columns:350px 1fr;gap:1.5rem;align-items:start;">
+  <!-- Add Category Form -->
+  <div class="admin-card">
+    <div class="admin-card-header"><span class="admin-card-title">Add Category</span></div>
+    <div style="padding:1.5rem;">
+      <form method="POST" action="{{ url_for('admin.categories') }}" novalidate>
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+        <div class="form-group">
+          <label class="form-label" for="cat-name">Name *</label>
+          <input type="text" id="cat-name" name="name" class="form-control" required placeholder="e.g. Coffee" />
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="cat-slug">Slug *</label>
+          <input type="text" id="cat-slug" name="slug" class="form-control" required placeholder="e.g. coffee" />
+          <div class="form-hint">URL-friendly identifier (auto-generated)</div>
+        </div>
+        <button type="submit" class="btn btn-primary">+ Add Category</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Categories List -->
+  <div class="admin-card">
+    <div class="admin-card-header">
+      <span class="admin-card-title">All Categories ({{ categories|length }})</span>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th>Name</th><th>Slug</th><th>Items</th><th>Action</th></tr>
+        </thead>
+        <tbody>
+          {% for cat in categories %}
+          <tr>
+            <td><strong>{{ cat.name }}</strong></td>
+            <td><code>{{ cat.slug }}</code></td>
+            <td>{{ cat.items.count() }}</td>
+            <td>
+              <form method="POST" action="{{ url_for('admin.delete_category', cat_id=cat.id) }}"
+                    data-confirm="Delete category '{{ cat.name }}'? Items won't be deleted.">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+                <button type="submit" class="btn btn-danger btn-sm">Delete</button>
+              </form>
+            </td>
+          </tr>
+          {% else %}
+          <tr><td colspan="4" style="text-align:center;padding:2rem;color:var(--color-brown-600);">No categories yet.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+// Auto-generate slug from name
+document.getElementById('cat-name')?.addEventListener('input', function() {
+  document.getElementById('cat-slug').value = this.value
+    .toLowerCase().trim()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '');
+});
+</script>
+{% endblock %}

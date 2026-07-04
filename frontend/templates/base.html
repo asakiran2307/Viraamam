@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="csrf-token" content="{{ csrf_token() }}" />
+  <title>{% block title %}Viraamam Cafe{% endblock %}</title>
+  <meta name="description" content="{% block meta_desc %}Viraamam — where every sip tells a story. Order artisan coffee, fresh pastries, and handcrafted meals online.{% endblock %}" />
+
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet" />
+
+  <!-- Swiper CSS -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.css" />
+
+  <!-- App CSS -->
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}" />
+
+  {% block extra_head %}{% endblock %}
+</head>
+<body>
+
+<!-- ── Navbar ──────────────────────────────────────── -->
+<nav class="navbar" id="main-navbar" role="navigation" aria-label="Main navigation">
+  <a href="{{ url_for('index') }}" class="navbar-brand">Viraama<span>m</span></a>
+
+  <ul class="nav-links" id="nav-links" role="list">
+    <li><a href="{{ url_for('index') }}" class="{% if request.endpoint == 'index' %}active{% endif %}">Home</a></li>
+    <li><a href="{{ url_for('items.catalog') }}" class="{% if request.endpoint and 'items' in request.endpoint %}active{% endif %}">Menu</a></li>
+    <li><a href="{{ url_for('ambience.gallery') }}" class="{% if request.endpoint and 'ambience' in request.endpoint %}active{% endif %}">Ambience</a></li>
+    {% if current_user.is_authenticated and current_user.is_admin %}
+    <li><a href="{{ url_for('admin.dashboard') }}">Admin</a></li>
+    {% endif %}
+  </ul>
+
+  <div class="nav-actions">
+    {% if current_user.is_authenticated %}
+      <button class="cart-btn" data-cart-open aria-label="Open cart">
+        🛒 Cart
+        <span class="cart-badge" id="cart-badge" style="display:none">0</span>
+      </button>
+      <a href="{{ url_for('auth.logout') }}" class="btn btn-outline btn-sm">Logout</a>
+    {% else %}
+      <a href="{{ url_for('auth.login') }}" class="btn btn-outline btn-sm">Login</a>
+      <a href="{{ url_for('auth.register') }}" class="btn btn-primary btn-sm">Sign Up</a>
+    {% endif %}
+    <button class="hamburger" id="hamburger" aria-label="Toggle menu" aria-expanded="false">
+      <span></span><span></span><span></span>
+    </button>
+  </div>
+</nav>
+
+<!-- ── Flash Messages ──────────────────────────────── -->
+{% with messages = get_flashed_messages(with_categories=true) %}
+  {% if messages %}
+  <div class="flash-messages" role="alert" aria-live="polite">
+    {% for category, message in messages %}
+      <div class="flash {{ category }}" role="status">{{ message }}</div>
+    {% endfor %}
+  </div>
+  {% endif %}
+{% endwith %}
+
+<!-- ── Cart Drawer ─────────────────────────────────── -->
+{% if current_user.is_authenticated %}
+<div class="cart-drawer-overlay" id="cart-overlay" aria-hidden="true"></div>
+<aside class="cart-drawer" id="cart-drawer" role="complementary" aria-label="Shopping cart">
+  <div class="cart-drawer-header">
+    <span class="cart-drawer-title">Your Cart</span>
+    <button class="cart-close-btn" data-cart-close aria-label="Close cart">✕</button>
+  </div>
+  <div class="cart-items-list" id="cart-items-content">
+    <div class="cart-empty">
+      <div class="cart-empty-icon">☕</div>
+      <p>Your cart is empty</p>
+      <a href="{{ url_for('items.catalog') }}" class="btn btn-primary btn-sm" style="margin-top:1rem;">Browse Menu</a>
+    </div>
+  </div>
+  <div class="cart-footer">
+    <div class="cart-total">
+      <span>Total</span>
+      <span id="cart-total">₹0</span>
+    </div>
+    <a href="{{ url_for('checkout') if 'checkout' in url_for.__globals__ else '/checkout' }}"
+       class="btn btn-primary" style="width:100%;justify-content:center;">
+      Proceed to Checkout →
+    </a>
+  </div>
+</aside>
+{% endif %}
+
+<!-- ── Toast Container ─────────────────────────────── -->
+<div class="toast-container" id="toast-container" aria-live="polite"></div>
+
+<!-- ── Page Content ────────────────────────────────── -->
+<main id="main-content">
+  {% block content %}{% endblock %}
+</main>
+
+<!-- ── Footer ─────────────────────────────────────── -->
+<footer class="footer">
+  <div class="container">
+    <div class="footer-grid">
+      <div>
+        <div class="footer-brand-name">Viraama<span>m</span></div>
+        <p class="footer-desc">A sanctuary of flavors, where artisan coffee meets warm hospitality. Every cup crafted with love, every dish made with care.</p>
+        <div class="footer-socials">
+          <a href="#" class="social-btn" aria-label="Instagram">📷</a>
+          <a href="#" class="social-btn" aria-label="Facebook">📘</a>
+          <a href="#" class="social-btn" aria-label="Twitter">🐦</a>
+        </div>
+      </div>
+      <div>
+        <div class="footer-heading">Quick Links</div>
+        <ul class="footer-links">
+          <li><a href="{{ url_for('index') }}">Home</a></li>
+          <li><a href="{{ url_for('items.catalog') }}">Menu</a></li>
+          <li><a href="{{ url_for('ambience.gallery') }}">Ambience</a></li>
+          {% if current_user.is_authenticated %}
+          <li><a href="{{ url_for('orders.my_orders') }}">My Orders</a></li>
+          {% else %}
+          <li><a href="{{ url_for('auth.login') }}">Login</a></li>
+          {% endif %}
+        </ul>
+      </div>
+      <div>
+        <div class="footer-heading">Hours</div>
+        <ul class="footer-links">
+          <li>Mon – Fri: 7am – 10pm</li>
+          <li>Saturday: 8am – 11pm</li>
+          <li>Sunday: 9am – 9pm</li>
+        </ul>
+      </div>
+      <div>
+        <div class="footer-heading">Find Us</div>
+        <p style="font-size:0.85rem;color:var(--color-brown-500);">123 Brew Lane, Chennai, Tamil Nadu</p>
+        <p style="font-size:0.85rem;color:var(--color-brown-500);margin-top:0.5rem;">📞 +91 98765 43210</p>
+        <p style="font-size:0.85rem;color:var(--color-brown-500);">✉️ hello@viraamam.com</p>
+        <div class="map-embed">
+          <iframe
+            src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d497699.9974129092!2d80.00892045!3d13.0826802!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x3a5265ea4f7d3361%3A0x6e61a70b6863d433!2sChennai%2C%20Tamil%20Nadu!5e0!3m2!1sen!2sin!4v1704000000000"
+            width="100%" height="120" style="border:0;" allowfullscreen="" loading="lazy"
+            referrerpolicy="no-referrer-when-downgrade" title="Viraamam location map">
+          </iframe>
+        </div>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <span>© {{ now.year if now else '2026' }} Viraamam Cafe. All rights reserved.</span>
+      <span>Made with ☕ in Chennai</span>
+    </div>
+  </div>
+</footer>
+
+<!-- ── Scripts ─────────────────────────────────────── -->
+<script src="https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js" defer></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/ScrollTrigger.min.js" defer></script>
+<script src="{{ url_for('static', filename='js/cart.js') }}"></script>
+<script src="{{ url_for('static', filename='js/carousel.js') }}"></script>
+{% block extra_scripts %}{% endblock %}
+
+<script>
+// Navbar scroll effect
+const navbar = document.getElementById('main-navbar');
+window.addEventListener('scroll', () => {
+  navbar?.classList.toggle('scrolled', window.scrollY > 40);
+}, { passive: true });
+
+// Hamburger menu
+const hamburger = document.getElementById('hamburger');
+const navLinks  = document.getElementById('nav-links');
+hamburger?.addEventListener('click', () => {
+  const open = navLinks?.classList.toggle('mobile-open');
+  hamburger.setAttribute('aria-expanded', open);
+});
+
+// Auto-dismiss flash messages
+document.querySelectorAll('.flash').forEach(el => {
+  setTimeout(() => {
+    el.style.transition = 'opacity 0.5s';
+    el.style.opacity = '0';
+    setTimeout(() => el.remove(), 500);
+  }, 4000);
+});
+
+// Inject current year in footer
+document.querySelectorAll('[data-year]').forEach(el => {
+  el.textContent = new Date().getFullYear();
+});
+</script>
+</body>
+</html>

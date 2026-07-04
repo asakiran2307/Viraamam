@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% block title %}My Orders — Viraamam Cafe{% endblock %}
+
+{% block content %}
+<div style="padding-top:70px;">
+<section class="section">
+  <div class="container" style="max-width:900px;">
+    <h1 style="font-family:var(--font-display);font-size:2rem;color:var(--color-brown-800);margin-bottom:0.5rem;">My Orders</h1>
+    <p style="color:var(--color-brown-600);margin-bottom:2rem;">Your complete order history with Viraamam.</p>
+
+    {% if orders %}
+    <div style="display:flex;flex-direction:column;gap:1.2rem;">
+      {% for order in orders %}
+      <div class="admin-card">
+        <div style="padding:1.2rem 1.5rem;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--color-cream-200);flex-wrap:wrap;gap:1rem;">
+          <div>
+            <strong>Order #{{ order.id }}</strong>
+            <span style="margin-left:1rem;" class="status-badge status-{{ order.status }}">{{ order.status|capitalize }}</span>
+          </div>
+          <div style="font-size:0.85rem;color:var(--color-brown-600);">{{ order.created_at.strftime('%d %B %Y, %H:%M') }}</div>
+        </div>
+        <div style="padding:1rem 1.5rem;">
+          {% for oi in order.order_items %}
+          <div style="display:flex;justify-content:space-between;font-size:0.9rem;padding:0.4rem 0;border-bottom:1px solid var(--color-cream-200);">
+            <span>{{ oi.item.name if oi.item else 'Item' }} × {{ oi.quantity }}</span>
+            <span>₹{{ "%.2f"|format(oi.price_at_purchase * oi.quantity) }}</span>
+          </div>
+          {% endfor %}
+          <div style="display:flex;justify-content:space-between;font-weight:700;margin-top:0.75rem;font-size:1rem;">
+            <span>Total</span>
+            <span style="color:var(--color-orange);">₹{{ "%.2f"|format(order.total_amount|float) }}</span>
+          </div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div style="text-align:center;padding:4rem 1rem;color:var(--color-brown-600);">
+      <div style="font-size:3rem;margin-bottom:1rem;">📦</div>
+      <h2 style="font-family:var(--font-display);">No orders yet</h2>
+      <p>You haven't placed any orders. Browse our menu and order something delicious!</p>
+      <a href="{{ url_for('items.catalog') }}" class="btn btn-primary" style="margin-top:1.5rem;">Browse Menu</a>
+    </div>
+    {% endif %}
+  </div>
+</section>
+</div>
+{% endblock %}

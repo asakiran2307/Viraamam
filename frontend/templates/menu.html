@@ -1,0 +1,174 @@
+{% extends "base.html" %}
+
+{% block title %}Menu — Viraamam Cafe{% endblock %}
+{% block meta_desc %}Browse Viraamam's full menu — coffees, teas, pastries, meals and more. Filter by category, search by name.{% endblock %}
+
+{% block content %}
+<div style="padding-top:70px;">
+
+<!-- ── Page Banner ────────────────────────────────── -->
+<section style="background:linear-gradient(135deg,var(--color-brown-900),var(--color-brown-700));padding:3rem 0;text-align:center;">
+  <div class="container">
+    <p class="section-eyebrow">Our Full Offering</p>
+    <h1 style="font-family:var(--font-display);font-size:2.5rem;color:var(--color-cream-100);">The Viraamam Menu</h1>
+    <p style="color:var(--color-cream-300);margin-top:0.5rem;">Every item crafted with care, every ingredient chosen with purpose.</p>
+  </div>
+</section>
+
+<!-- ── Sticky Filter Bar ───────────────────────────── -->
+<div id="filter-bar" style="position:sticky;top:70px;z-index:200;background:white;border-bottom:1px solid var(--color-cream-200);box-shadow:var(--shadow-sm);">
+  <div class="container" style="padding-top:1rem;padding-bottom:1rem;">
+    <div style="display:flex;gap:1rem;align-items:center;flex-wrap:wrap;">
+      <form method="GET" action="{{ url_for('items.catalog') }}" style="flex:1;min-width:200px;display:flex;gap:0.75rem;align-items:center;" id="filter-form">
+        <input
+          type="search"
+          name="q"
+          value="{{ search }}"
+          placeholder="Search menu…"
+          class="form-control"
+          style="max-width:260px;"
+          id="menu-search"
+          aria-label="Search menu items"
+        />
+        {% if request.args.get('category') %}
+        <input type="hidden" name="category" value="{{ current_category }}" />
+        {% endif %}
+      </form>
+      <div class="category-pills" style="flex:1;">
+        <a href="{{ url_for('items.catalog') }}" class="pill {% if not current_category %}active{% endif %}">All</a>
+        {% for cat in categories %}
+        <a href="{{ url_for('items.catalog', category=cat.slug, q=search) }}" class="pill {% if current_category == cat.slug %}active{% endif %}">{{ cat.name }}</a>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Items Grid ─────────────────────────────────── -->
+<section class="section">
+  <div class="container">
+
+    {% if search or current_category %}
+    <p style="margin-bottom:1.5rem;color:var(--color-brown-600);font-size:0.9rem;">
+      {% if pagination.total %}
+        Showing <strong>{{ pagination.total }}</strong> result(s)
+        {% if search %} for "<strong>{{ search }}</strong>"{% endif %}
+        {% if current_category %} in <strong>{{ current_category }}</strong>{% endif %}
+      {% else %}
+        No results found.
+      {% endif %}
+    </p>
+    {% endif %}
+
+    <div class="items-grid" id="items-grid">
+      {% if items %}
+        {% for item in items %}
+        <article class="item-card">
+          <div class="item-card-img-wrapper">
+            {% if item.image_data %}
+            <img
+              class="item-card-img"
+              src="{{ url_for('items.image', item_id=item.id) }}"
+              alt="{{ item.name }}"
+              loading="lazy"
+            />
+            {% else %}
+            <div class="item-card-img" style="background:var(--color-cream-200);display:flex;align-items:center;justify-content:center;font-size:3rem;height:220px;">☕</div>
+            {% endif %}
+            {% if not item.in_stock %}
+            <span class="stock-badge badge-out">Out of Stock</span>
+            {% elif item.low_stock %}
+            <span class="stock-badge badge-low">Only {{ item.stock_quantity }} left!</span>
+            {% endif %}
+          </div>
+          <div class="item-card-body">
+            {% if item.category %}
+            <p class="item-card-category">{{ item.category.name }}</p>
+            {% endif %}
+            <h2 class="item-card-name">
+              <a href="{{ url_for('items.detail', item_id=item.id) }}" style="color:inherit;">{{ item.name }}</a>
+            </h2>
+            {% if item.description %}
+            <p class="item-card-desc">{{ item.description }}</p>
+            {% endif %}
+            <div class="item-card-footer">
+              <span class="item-price">{{ "%.2f"|format(item.price|float) }}</span>
+              {% if current_user.is_authenticated %}
+                <button
+                  class="add-to-cart-btn"
+                  data-add-to-cart="{{ item.id }}"
+                  {% if not item.in_stock %}disabled{% endif %}
+                  aria-label="Add {{ item.name }} to cart"
+                >+</button>
+              {% else %}
+                <a href="{{ url_for('auth.login') }}" class="add-to-cart-btn" title="Login to order">+</a>
+              {% endif %}
+            </div>
+          </div>
+        </article>
+        {% endfor %}
+      {% else %}
+      <div style="grid-column:1/-1;text-align:center;padding:4rem 1rem;color:var(--color-brown-600);">
+        <div style="font-size:3rem;margin-bottom:1rem;">☕</div>
+        <h2 style="font-family:var(--font-display);">No items found</h2>
+        <p>Try a different search or category.</p>
+        <a href="{{ url_for('items.catalog') }}" class="btn btn-primary" style="margin-top:1.5rem;">Clear Filters</a>
+      </div>
+      {% endif %}
+    </div>
+
+    <!-- Pagination -->
+    {% if pagination and pagination.pages > 1 %}
+    <nav class="pagination" aria-label="Page navigation">
+      {% if pagination.has_prev %}
+      <a href="{{ url_for('items.catalog', page=pagination.prev_num, category=current_category, q=search) }}" class="page-btn" aria-label="Previous page">‹</a>
+      {% else %}
+      <button class="page-btn" disabled aria-disabled="true">‹</button>
+      {% endif %}
+
+      {% for pg in pagination.iter_pages(left_edge=1, right_edge=1, left_current=2, right_current=2) %}
+        {% if pg %}
+          <a href="{{ url_for('items.catalog', page=pg, category=current_category, q=search) }}"
+             class="page-btn {% if pg == pagination.page %}active{% endif %}"
+             aria-label="Page {{ pg }}" {% if pg == pagination.page %}aria-current="page"{% endif %}>{{ pg }}</a>
+        {% else %}
+          <span class="page-btn" style="cursor:default">…</span>
+        {% endif %}
+      {% endfor %}
+
+      {% if pagination.has_next %}
+      <a href="{{ url_for('items.catalog', page=pagination.next_num, category=current_category, q=search) }}" class="page-btn" aria-label="Next page">›</a>
+      {% else %}
+      <button class="page-btn" disabled aria-disabled="true">›</button>
+      {% endif %}
+    </nav>
+    {% endif %}
+
+  </div>
+</section>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+// Auto-submit search with debounce
+let searchTimer;
+document.getElementById('menu-search')?.addEventListener('input', function() {
+  clearTimeout(searchTimer);
+  searchTimer = setTimeout(() => this.form.submit(), 600);
+});
+
+// GSAP reveal
+window.addEventListener('load', () => {
+  if (typeof gsap === 'undefined' || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  if (typeof ScrollTrigger !== 'undefined') gsap.registerPlugin(ScrollTrigger);
+  gsap.utils.toArray('.item-card').forEach((el, i) => {
+    gsap.from(el, {
+      opacity: 0, y: 30, duration: 0.5,
+      delay: (i % 4) * 0.08,
+      scrollTrigger: { trigger: el, start: 'top 90%' },
+    });
+  });
+});
+</script>
+{% endblock %}

@@ -1,0 +1,50 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.eggs/
+dist/
+build/
+*.egg
+
+# Virtual environments
+venv/
+.venv/
+env/
+.env/
+
+# Environment secrets — NEVER COMMIT
+.env
+*.env
+!.env.example
+
+# Flask
+instance/
+*.db
+*.sqlite3
+
+# Migrations (keep migrations/ but ignore auto-generated)
+# (Keep migrations tracked in git)
+
+# Logs
+*.log
+logs/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Docker
+.dockerignore
+
+# Node (if frontend tooling added)
+node_modules/
+.npm/

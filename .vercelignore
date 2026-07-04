@@ -1,0 +1,15 @@
+# Vercel deployment — exclude files not needed in the serverless bundle
+__pycache__/
+*.pyc
+*.pyo
+.env
+*.db
+*.sqlite3
+.git/
+.gitignore
+docker-compose.yml
+nginx/
+*.log
+backend/migrations/
+prompt.txt
+README.md

@@ -1,0 +1,134 @@
+{% extends "base.html" %}
+
+{% block title %}{{ item.name }} — Viraamam Cafe{% endblock %}
+{% block meta_desc %}{{ item.description[:150] if item.description else item.name }} — Order from Viraamam Cafe.{% endblock %}
+
+{% block content %}
+<div style="padding-top:70px;">
+<section class="item-detail-page">
+  <div class="container">
+    <!-- Breadcrumb -->
+    <nav aria-label="Breadcrumb" style="margin-bottom:2rem;font-size:0.85rem;color:var(--color-brown-600);">
+      <a href="{{ url_for('index') }}">Home</a>
+      <span style="margin:0 0.5rem;">›</span>
+      <a href="{{ url_for('items.catalog') }}">Menu</a>
+      {% if item.category %}
+      <span style="margin:0 0.5rem;">›</span>
+      <a href="{{ url_for('items.catalog', category=item.category.slug) }}">{{ item.category.name }}</a>
+      {% endif %}
+      <span style="margin:0 0.5rem;">›</span>
+      <span>{{ item.name }}</span>
+    </nav>
+
+    <div class="item-detail-grid">
+      <!-- Image -->
+      <div>
+        <div class="item-detail-img-wrap">
+          {% if item.image_data %}
+          <img
+            class="item-detail-img"
+            src="{{ url_for('items.image', item_id=item.id) }}"
+            alt="{{ item.name }}"
+          />
+          {% else %}
+          <div class="item-detail-img" style="background:var(--color-cream-200);display:flex;align-items:center;justify-content:center;font-size:6rem;aspect-ratio:4/3;">☕</div>
+          {% endif %}
+        </div>
+      </div>
+
+      <!-- Details -->
+      <div>
+        {% if item.category %}
+        <p class="item-detail-category">{{ item.category.name }}</p>
+        {% endif %}
+
+        <h1 class="item-detail-name">{{ item.name }}</h1>
+
+        <div class="item-detail-price">₹{{ "%.2f"|format(item.price|float) }}</div>
+
+        <!-- Stock status -->
+        <div class="item-detail-stock">
+          {% if not item.in_stock %}
+          <span class="stock-badge badge-out" style="font-size:0.85rem;padding:0.4rem 0.9rem;">Out of Stock</span>
+          {% elif item.low_stock %}
+          <span class="stock-badge badge-low" style="font-size:0.85rem;padding:0.4rem 0.9rem;">
+            Only {{ item.stock_quantity }} left — order soon!
+          </span>
+          {% else %}
+          <span style="color:var(--color-success);font-size:0.88rem;font-weight:600;">✓ In Stock ({{ item.stock_quantity }} available)</span>
+          {% endif %}
+        </div>
+
+        {% if item.description %}
+        <p class="item-detail-desc">{{ item.description }}</p>
+        {% endif %}
+
+        {% if item.in_stock %}
+          {% if current_user.is_authenticated %}
+          <!-- Quantity Stepper -->
+          <div class="qty-stepper">
+            <button class="qty-stepper-btn" id="qty-minus" aria-label="Decrease quantity">−</button>
+            <span class="qty-stepper-val" id="item-qty" aria-live="polite">1</span>
+            <button class="qty-stepper-btn" id="qty-plus" aria-label="Increase quantity">+</button>
+          </div>
+
+          <button
+            class="btn btn-primary"
+            data-add-to-cart="{{ item.id }}"
+            id="add-to-cart-main"
+            style="width:100%;justify-content:center;margin-top:0.5rem;"
+          >
+            🛒 Add to Cart
+          </button>
+          {% else %}
+          <a href="{{ url_for('auth.login', next=request.path) }}" class="btn btn-primary" style="width:100%;justify-content:center;margin-top:1rem;">
+            Login to Order
+          </a>
+          {% endif %}
+        {% else %}
+        <button class="btn btn-ghost" disabled style="width:100%;justify-content:center;cursor:not-allowed;opacity:0.6;">
+          Out of Stock
+        </button>
+        {% endif %}
+
+        <!-- Delivery Info -->
+        <div style="margin-top:2rem;padding:1.2rem;background:var(--color-cream-100);border-radius:var(--radius-md);border-left:3px solid var(--color-orange);">
+          <p style="font-size:0.85rem;color:var(--color-brown-600);line-height:1.7;">
+            ☕ <strong>Fresh made to order.</strong> Your item will be prepared when you arrive or for pickup.<br>
+            📍 Available at Viraamam Cafe, 123 Brew Lane, Chennai.
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+let qty = 1;
+const maxQty = {{ item.stock_quantity }};
+const qtyEl   = document.getElementById('item-qty');
+const minusBtn = document.getElementById('qty-minus');
+const plusBtn  = document.getElementById('qty-plus');
+
+function updateQtyDisplay() {
+  if (qtyEl) qtyEl.textContent = qty;
+  if (minusBtn) minusBtn.disabled = qty <= 1;
+  if (plusBtn)  plusBtn.disabled  = qty >= maxQty;
+}
+
+minusBtn?.addEventListener('click', () => { if (qty > 1) { qty--; updateQtyDisplay(); } });
+plusBtn?.addEventListener('click',  () => { if (qty < maxQty) { qty++; updateQtyDisplay(); } });
+
+// Override data-add-to-cart to use qty stepper value
+document.getElementById('add-to-cart-main')?.addEventListener('click', async function() {
+  this.disabled = true;
+  await Cart.addItem('{{ item.id }}', qty);
+  this.disabled = false;
+});
+
+updateQtyDisplay();
+</script>
+{% endblock %}

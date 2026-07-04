@@ -1,0 +1,109 @@
+{% extends "base.html" %}
+
+{% block title %}Ambience — Viraamam Cafe{% endblock %}
+{% block meta_desc %}Step inside Viraamam Cafe — explore our warm, inviting ambience through our photo gallery. A space crafted for comfort and community.{% endblock %}
+
+{% block content %}
+
+<!-- ── Hero Banner ────────────────────────────────── -->
+<section class="ambience-hero" aria-labelledby="ambience-title" style="padding-top:70px;">
+  <div class="ambience-hero-content" style="position:relative;z-index:2;text-align:center;padding:2rem;">
+    <p class="hero-eyebrow">Inside Viraamam</p>
+    <h1 class="hero-title" id="ambience-title" style="font-size:clamp(2rem,6vw,3.5rem);">
+      Our <em>Ambience</em>
+    </h1>
+    <p class="hero-subtitle" style="max-width:520px;margin:0 auto;">
+      Every corner is designed to inspire calm, creativity, and connection.
+      Pull up a chair, stay a while.
+    </p>
+  </div>
+
+  <!-- Decorative coffee ring SVG -->
+  <svg style="position:absolute;bottom:-1px;left:0;right:0;width:100%;" viewBox="0 0 1440 60" preserveAspectRatio="none" aria-hidden="true">
+    <path d="M0,60 C360,0 1080,60 1440,0 L1440,60 Z" fill="#fdf8f2"/>
+  </svg>
+</section>
+
+<!-- ── Gallery Section ───────────────────────────── -->
+<section class="section" aria-labelledby="gallery-title">
+  <div class="container">
+
+    {% if photos %}
+    <div class="section-header">
+      <p class="section-eyebrow">Gallery</p>
+      <h2 class="section-title" id="gallery-title">Moments at Viraamam</h2>
+      <p class="section-subtitle">{{ photos|length }} curated photo{{ 's' if photos|length != 1 else '' }} from our space</p>
+    </div>
+
+    <div class="ambience-gallery" id="ambience-gallery" role="list" aria-label="Ambience photo gallery">
+      {% for photo in photos %}
+      <figure
+        class="gallery-item"
+        role="listitem"
+        data-title="{{ photo.title | e }}"
+        data-caption="{{ photo.caption | e if photo.caption else '' }}"
+        tabindex="0"
+        aria-label="Photo: {{ photo.title }}"
+      >
+        <img
+          src="{{ url_for('ambience.photo_image', photo_id=photo.id) }}"
+          alt="{{ photo.title }}"
+          loading="lazy"
+        />
+        <figcaption class="gallery-overlay" aria-hidden="true">
+          <div class="gallery-title">{{ photo.title }}</div>
+          {% if photo.caption %}
+          <div class="gallery-caption">{{ photo.caption }}</div>
+          {% endif %}
+        </figcaption>
+      </figure>
+      {% endfor %}
+    </div>
+
+    {% else %}
+    <!-- Empty state -->
+    <div style="text-align:center;padding:5rem 1rem;">
+      <div style="font-size:4rem;margin-bottom:1.5rem;">📷</div>
+      <h2 style="font-family:var(--font-display);font-size:1.8rem;color:var(--color-brown-800);margin-bottom:0.75rem;">
+        Photos Coming Soon
+      </h2>
+      <p style="color:var(--color-brown-600);max-width:400px;margin:0 auto;">
+        We're curating the perfect collection to showcase our space. Check back soon!
+      </p>
+    </div>
+    {% endif %}
+
+  </div>
+</section>
+
+<!-- ── Visit Section ─────────────────────────────── -->
+<section class="section" style="background:var(--color-cream-200);">
+  <div class="container" style="text-align:center;">
+    <p class="section-eyebrow">Come See For Yourself</p>
+    <h2 class="section-title">Visit Us Today</h2>
+    <p class="section-subtitle" style="margin-bottom:2rem;">
+      Photos can only tell half the story. Come in and experience the warmth of Viraamam firsthand.
+    </p>
+    <div style="display:flex;gap:1rem;justify-content:center;flex-wrap:wrap;">
+      <a href="{{ url_for('items.catalog') }}" class="btn btn-primary">☕ Order Now</a>
+      <a href="{{ url_for('index') }}#footer" class="btn btn-outline btn-ghost">📍 Find Us</a>
+    </div>
+  </div>
+</section>
+
+<!-- ── Lightbox ───────────────────────────────────── -->
+<div class="lightbox" id="lightbox" role="dialog" aria-modal="true" aria-label="Photo lightbox" aria-hidden="true">
+  <div class="lightbox-inner">
+    <button class="lightbox-close" id="lb-close" aria-label="Close lightbox">✕</button>
+    <button class="lightbox-nav lightbox-prev" id="lb-prev" aria-label="Previous photo">‹</button>
+    <img class="lightbox-img" id="lb-img" src="" alt="" />
+    <button class="lightbox-nav lightbox-next" id="lb-next" aria-label="Next photo">›</button>
+    <p class="lightbox-caption" id="lb-caption"></p>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="{{ url_for('static', filename='js/ambience.js') }}"></script>
+{% endblock %}

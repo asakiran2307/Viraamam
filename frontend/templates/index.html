@@ -1,0 +1,212 @@
+{% extends "base.html" %}
+
+{% block title %}Viraamam Cafe — Order Artisan Coffee & More{% endblock %}
+{% block meta_desc %}Viraamam Cafe — experience the finest artisan coffee, fresh pastries, and handcrafted meals. Order online for pickup or dine-in.{% endblock %}
+
+{% block content %}
+
+<!-- ── Hero Section ──────────────────────────────────── -->
+<section class="hero" aria-labelledby="hero-title">
+  <canvas id="hero-canvas" aria-hidden="true"></canvas>
+  <div class="hero-content">
+    <p class="hero-eyebrow">Welcome to Viraamam</p>
+    <h1 class="hero-title" id="hero-title">
+      Where Every Sip<br><em>Tells a Story</em>
+    </h1>
+    <p class="hero-subtitle">
+      Artisan coffee, freshly baked pastries, and wholesome meals — crafted with love, served with warmth.
+    </p>
+    <div class="hero-cta-group">
+      <a href="{{ url_for('items.catalog') }}" class="btn btn-primary" id="hero-order-btn">
+        ☕ Order Now
+      </a>
+      <a href="{{ url_for('ambience.gallery') }}" class="btn btn-outline" id="hero-ambience-btn">
+        ✨ Our Ambience
+      </a>
+    </div>
+  </div>
+  <!-- Scroll indicator -->
+  <div style="position:absolute;bottom:2rem;left:50%;transform:translateX(-50%);text-align:center;color:rgba(245,235,221,0.5);">
+    <div style="font-size:0.75rem;letter-spacing:0.15em;text-transform:uppercase;margin-bottom:0.5rem;">Scroll</div>
+    <div style="width:1px;height:40px;background:rgba(212,98,42,0.5);margin:0 auto;animation:pulse-grow 1.5s ease-in-out infinite;"></div>
+  </div>
+</section>
+
+<style>
+@keyframes pulse-grow {
+  0%,100% { transform: scaleY(1); opacity:0.5; }
+  50% { transform: scaleY(1.3); opacity:1; }
+}
+</style>
+
+<!-- ── Ad Carousel ───────────────────────────────────── -->
+{% if ads %}
+<section class="ad-carousel-section" aria-label="Featured promotions">
+  <div class="swiper ad-swiper">
+    <div class="swiper-wrapper">
+      {% for ad in ads %}
+      <div class="swiper-slide ad-slide">
+        <img
+          src="{{ url_for('items.image', item_id=ad.item_id) if ad.item_id else url_for('static', filename='assets/ad-placeholder.jpg') }}"
+          alt="{{ ad.title }}"
+          loading="lazy"
+        />
+        <div class="ad-slide-content">
+          <h2 class="ad-slide-title">{{ ad.title }}</h2>
+          {% if ad.item_id %}
+          <a href="{{ url_for('items.detail', item_id=ad.item_id) }}" class="btn btn-primary btn-sm">Order Now</a>
+          {% endif %}
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    <div class="swiper-pagination"></div>
+  </div>
+</section>
+{% endif %}
+
+<!-- ── Category Pills ────────────────────────────────── -->
+<section class="section-sm" style="background:var(--color-cream-200);">
+  <div class="container">
+    <div class="section-header" style="margin-bottom:1.5rem;">
+      <p class="section-eyebrow">Explore Our Menu</p>
+      <h2 class="section-title">What Are You Craving?</h2>
+    </div>
+    <div class="category-pills" role="list" aria-label="Menu categories">
+      <a href="{{ url_for('items.catalog') }}" class="pill active" role="listitem">All Items</a>
+      {% for cat in categories %}
+      <a href="{{ url_for('items.catalog', category=cat.slug) }}" class="pill" role="listitem">{{ cat.name }}</a>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+
+<!-- ── Featured Items ────────────────────────────────── -->
+<section class="section" aria-labelledby="featured-title">
+  <div class="container">
+    <div class="section-header">
+      <p class="section-eyebrow">Fresh & Handcrafted</p>
+      <h2 class="section-title" id="featured-title">Today's Favorites</h2>
+      <p class="section-subtitle">From our kitchen to your table — made fresh daily.</p>
+    </div>
+
+    <div class="items-grid" id="featured-grid">
+      {% if featured %}
+        {% for item in featured %}
+        <article class="item-card" data-gsap-reveal>
+          <div class="item-card-img-wrapper">
+            {% if item.image_data %}
+            <img
+              class="item-card-img"
+              src="{{ url_for('items.image', item_id=item.id) }}"
+              alt="{{ item.name }}"
+              loading="lazy"
+            />
+            {% else %}
+            <div class="item-card-img skeleton" style="height:220px;background:var(--color-cream-200);display:flex;align-items:center;justify-content:center;font-size:3rem;">☕</div>
+            {% endif %}
+
+            {% if not item.in_stock %}
+            <span class="stock-badge badge-out">Out of Stock</span>
+            {% elif item.low_stock %}
+            <span class="stock-badge badge-low">Only {{ item.stock_quantity }} left</span>
+            {% endif %}
+          </div>
+          <div class="item-card-body">
+            {% if item.category %}
+            <p class="item-card-category">{{ item.category.name }}</p>
+            {% endif %}
+            <h3 class="item-card-name">
+              <a href="{{ url_for('items.detail', item_id=item.id) }}" style="color:inherit;">{{ item.name }}</a>
+            </h3>
+            {% if item.description %}
+            <p class="item-card-desc">{{ item.description }}</p>
+            {% endif %}
+            <div class="item-card-footer">
+              <span class="item-price">{{ "%.2f"|format(item.price|float) }}</span>
+              {% if current_user.is_authenticated %}
+                <button
+                  class="add-to-cart-btn"
+                  data-add-to-cart="{{ item.id }}"
+                  {% if not item.in_stock %}disabled{% endif %}
+                  aria-label="Add {{ item.name }} to cart"
+                  title="Add to cart"
+                >+</button>
+              {% else %}
+                <a href="{{ url_for('auth.login') }}" class="add-to-cart-btn" title="Login to order">+</a>
+              {% endif %}
+            </div>
+          </div>
+        </article>
+        {% endfor %}
+      {% else %}
+      <p style="grid-column:1/-1;text-align:center;color:var(--color-brown-600);padding:3rem;">
+        No items available yet. Check back soon!
+      </p>
+      {% endif %}
+    </div>
+
+    <div style="text-align:center;margin-top:3rem;">
+      <a href="{{ url_for('items.catalog') }}" class="btn btn-primary" id="view-full-menu-btn">View Full Menu →</a>
+    </div>
+  </div>
+</section>
+
+<!-- ── Why Viraamam ──────────────────────────────────── -->
+<section class="section" style="background:var(--color-brown-800);color:var(--color-cream-200);">
+  <div class="container">
+    <div class="section-header">
+      <p class="section-eyebrow" style="color:var(--color-orange);">Our Promise</p>
+      <h2 class="section-title" style="color:var(--color-cream-100);">Why Viraamam?</h2>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:2rem;text-align:center;">
+      {% for feature in [
+        ('☕', 'Single-Origin Beans', 'Sourced directly from estates across India and South America.'),
+        ('🍞', 'Baked Fresh Daily', 'Our pastries leave the oven before 7am every morning.'),
+        ('🌿', 'Plant-Based Options', 'Extensive vegan and vegetarian-friendly menu.'),
+        ('📱', 'Easy Online Ordering', 'Order ahead, skip the queue, enjoy your moment.')
+      ] %}
+      <div style="padding:1.5rem;" data-gsap-reveal>
+        <div style="font-size:2.5rem;margin-bottom:1rem;">{{ feature[0] }}</div>
+        <h3 style="font-family:var(--font-display);font-size:1.1rem;color:var(--color-cream-100);margin-bottom:0.5rem;">{{ feature[1] }}</h3>
+        <p style="font-size:0.88rem;color:var(--color-brown-500);line-height:1.7;">{{ feature[2] }}</p>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+
+<!-- ── Ambience Teaser ───────────────────────────────── -->
+<section class="section" aria-labelledby="ambience-teaser-title">
+  <div class="container" style="text-align:center;">
+    <p class="section-eyebrow">The Viraamam Experience</p>
+    <h2 class="section-title" id="ambience-teaser-title">Step Inside Our World</h2>
+    <p class="section-subtitle" style="margin-bottom:2.5rem;">
+      Warm lighting, curated playlists, cozy nooks — discover the space that makes every visit special.
+    </p>
+    <a href="{{ url_for('ambience.gallery') }}" class="btn btn-primary" id="explore-ambience-btn">
+      ✨ Explore Our Ambience
+    </a>
+  </div>
+</section>
+
+{% endblock %}
+
+{% block extra_scripts %}
+<!-- Lazy-load Three.js hero -->
+<script src="{{ url_for('static', filename='js/three-hero.js') }}" defer></script>
+<script>
+// GSAP scroll reveal for featured cards
+window.addEventListener('load', () => {
+  if (typeof gsap === 'undefined' || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  if (typeof ScrollTrigger !== 'undefined') gsap.registerPlugin(ScrollTrigger);
+  gsap.utils.toArray('[data-gsap-reveal]').forEach((el, i) => {
+    gsap.from(el, {
+      opacity: 0, y: 40, duration: 0.6,
+      delay: (i % 4) * 0.1,
+      scrollTrigger: { trigger: el, start: 'top 88%' },
+    });
+  });
+});
+</script>
+{% endblock %}

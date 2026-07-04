@@ -1,0 +1,115 @@
+{% extends "admin/base_admin.html" %}
+{% block title %}{{ action }} Item — Viraamam Admin{% endblock %}
+
+{% block content %}
+<div style="display:flex;align-items:center;gap:1rem;margin-bottom:2rem;">
+  <a href="{{ url_for('admin.items') }}" class="btn btn-ghost btn-sm">← Back to Items</a>
+</div>
+
+<h1 class="admin-page-title">{{ action }} Item</h1>
+<p class="admin-page-subtitle">{% if action == 'Add' %}Add a new item to the menu.{% else %}Update details for "{{ item.name }}".{% endif %}</p>
+
+<div class="admin-card" style="max-width:720px;">
+  <div style="padding:2rem;">
+    <form method="POST"
+          action="{{ url_for('admin.edit_item', item_id=item.id) if item else url_for('admin.add_item') }}"
+          enctype="multipart/form-data"
+          novalidate
+          id="item-form">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.2rem;">
+        <div class="form-group" style="grid-column:1/-1;">
+          <label class="form-label" for="name">Item Name *</label>
+          <input type="text" id="name" name="name" class="form-control" required
+                 value="{{ item.name if item else '' }}" placeholder="e.g. Cappuccino" />
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="price">Price (₹) *</label>
+          <input type="number" id="price" name="price" class="form-control" required
+                 step="0.01" min="0"
+                 value="{{ item.price if item else '' }}" placeholder="0.00" />
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="stock_quantity">Stock Quantity *</label>
+          <input type="number" id="stock_quantity" name="stock_quantity" class="form-control" required
+                 min="0" value="{{ item.stock_quantity if item else 0 }}" />
+        </div>
+
+        <div class="form-group" style="grid-column:1/-1;">
+          <label class="form-label" for="category_id">Category</label>
+          <select id="category_id" name="category_id" class="form-control">
+            <option value="">-- No Category --</option>
+            {% for cat in categories %}
+            <option value="{{ cat.id }}"
+              {% if item and item.category_id == cat.id %}selected{% endif %}>
+              {{ cat.name }}
+            </option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div class="form-group" style="grid-column:1/-1;">
+          <label class="form-label" for="description">Description</label>
+          <textarea id="description" name="description" class="form-control" rows="4"
+                    placeholder="Describe the item…">{{ item.description if item else '' }}</textarea>
+        </div>
+
+        <!-- Image Upload -->
+        <div class="form-group" style="grid-column:1/-1;">
+          <label class="form-label">Item Image</label>
+          <div class="img-upload-wrap">
+            {% if item and item.image_data %}
+            <img id="img-preview" class="img-preview visible"
+                 src="{{ url_for('admin.item_image', item_id=item.id) }}" alt="Current image" />
+            <p style="font-size:0.8rem;color:var(--color-brown-600);margin:0.5rem 0;">Current image shown above. Upload a new one to replace it.</p>
+            {% else %}
+            <img id="img-preview" class="img-preview" src="" alt="Image preview" />
+            {% endif %}
+            <label class="upload-placeholder" data-for="image" style="cursor:pointer;">
+              <div class="upload-icon">📷</div>
+              <div class="upload-text">
+                Click to upload image<br>
+                <small>JPEG, PNG, WebP — max 5MB</small>
+              </div>
+            </label>
+            <input type="file" id="image" name="image" accept="image/*"
+                   data-preview="img-preview" style="display:none;" />
+          </div>
+        </div>
+
+        <!-- Active Toggle -->
+        <div class="form-group" style="grid-column:1/-1;">
+          <label style="display:flex;align-items:center;gap:0.75rem;cursor:pointer;">
+            <input type="checkbox" name="is_active" id="is_active"
+                   {% if not item or item.is_active %}checked{% endif %}
+                   style="width:18px;height:18px;accent-color:var(--color-orange);" />
+            <span class="form-label" style="margin:0;">Active (visible on the menu)</span>
+          </label>
+        </div>
+      </div>
+
+      <div style="display:flex;gap:1rem;margin-top:1.5rem;">
+        <button type="submit" class="btn btn-primary" id="save-btn">
+          {{ '💾 Save Changes' if item else '+ Add Item' }}
+        </button>
+        <a href="{{ url_for('admin.items') }}" class="btn btn-ghost">Cancel</a>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+document.getElementById('item-form')?.addEventListener('submit', function() {
+  const btn = document.getElementById('save-btn');
+  if (btn) {
+    btn.textContent = 'Saving…';
+    setTimeout(() => { btn.disabled = true; }, 50);
+  }
+});
+</script>
+{% endblock %}

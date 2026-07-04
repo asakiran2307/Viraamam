@@ -1,0 +1,125 @@
+{% extends "admin/base_admin.html" %}
+{% block title %}Ambience Photos — Viraamam Admin{% endblock %}
+
+{% block content %}
+<h1 class="admin-page-title">Ambience Photos</h1>
+<p class="admin-page-subtitle">Upload photos to populate the public Ambience gallery page. Customers will see these on the Ambience page.</p>
+
+<!-- Upload Form -->
+<div class="admin-card" style="margin-bottom:2rem;">
+  <div class="admin-card-header">
+    <span class="admin-card-title">📷 Upload New Photo</span>
+  </div>
+  <div style="padding:1.5rem;">
+    <form method="POST" action="{{ url_for('admin.upload_ambience') }}" enctype="multipart/form-data" novalidate>
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.2rem;">
+        <div class="form-group">
+          <label class="form-label" for="amb-title">Title *</label>
+          <input type="text" id="amb-title" name="title" class="form-control" required
+                 placeholder="e.g. Cozy Corner, Rooftop View" />
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="amb-order">Display Order</label>
+          <input type="number" id="amb-order" name="display_order" class="form-control"
+                 min="0" value="0" />
+          <div class="form-hint">Lower number = shown first</div>
+        </div>
+
+        <div class="form-group" style="grid-column:1/-1;">
+          <label class="form-label" for="amb-caption">Caption (optional)</label>
+          <input type="text" id="amb-caption" name="caption" class="form-control"
+                 placeholder="A short description shown in the gallery overlay…" />
+        </div>
+
+        <!-- Image Upload -->
+        <div class="form-group" style="grid-column:1/-1;">
+          <label class="form-label">Photo *</label>
+          <div class="img-upload-wrap">
+            <img id="amb-img-preview" class="img-preview" src="" alt="Preview" />
+            <label class="upload-placeholder" data-for="amb-image" style="cursor:pointer;">
+              <div class="upload-icon">📷</div>
+              <div class="upload-text">
+                Click to select photo<br>
+                <small>JPEG, PNG, WebP — max 5MB. Will be re-encoded for safety.</small>
+              </div>
+            </label>
+            <input type="file" id="amb-image" name="image" accept="image/*"
+                   data-preview="amb-img-preview" required style="display:none;" />
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label style="display:flex;align-items:center;gap:0.75rem;cursor:pointer;">
+            <input type="checkbox" name="is_active" id="amb-active" checked
+                   style="width:18px;height:18px;accent-color:var(--color-orange);" />
+            <span class="form-label" style="margin:0;">Active (show on Ambience page)</span>
+          </label>
+        </div>
+      </div>
+
+      <button type="submit" class="btn btn-primary" style="margin-top:0.5rem;">Upload Photo</button>
+    </form>
+  </div>
+</div>
+
+<!-- Existing Photos Grid -->
+<div class="admin-card">
+  <div class="admin-card-header">
+    <span class="admin-card-title">Uploaded Photos ({{ photos|length }})</span>
+    <a href="{{ url_for('ambience.gallery') }}" target="_blank" class="btn btn-ghost btn-sm">👁 View Gallery Page</a>
+  </div>
+  <div style="padding:1.5rem;">
+    {% if photos %}
+    <div class="ambience-upload-grid">
+      {% for photo in photos %}
+      <div class="ambience-thumb-card">
+        <img src="{{ url_for('admin.ambience_photo_image', photo_id=photo.id) }}" alt="{{ photo.title }}" />
+        <div class="ambience-thumb-body">
+          <div class="ambience-thumb-title">{{ photo.title }}</div>
+          {% if photo.caption %}
+          <div style="font-size:0.78rem;color:var(--color-brown-600);">{{ photo.caption[:60] }}{% if photo.caption|length > 60 %}…{% endif %}</div>
+          {% endif %}
+          <div style="font-size:0.75rem;color:var(--color-brown-500);margin-top:0.3rem;">
+            Order: {{ photo.display_order }} ·
+            <span style="color:{% if photo.is_active %}var(--color-success){% else %}var(--color-danger){% endif %};">
+              {% if photo.is_active %}Active{% else %}Hidden{% endif %}
+            </span>
+          </div>
+          <div class="ambience-thumb-actions">
+            <!-- Toggle Active -->
+            <button
+              class="btn btn-ghost btn-sm"
+              data-toggle-url="{{ url_for('admin.toggle_ambience', photo_id=photo.id) }}"
+              title="{{ 'Deactivate' if photo.is_active else 'Activate' }}"
+              style="flex:1;"
+            >
+              <div class="toggle-switch" style="pointer-events:none;">
+                <div class="toggle-track {% if photo.is_active %}on{% endif %}">
+                  <div class="toggle-thumb"></div>
+                </div>
+                <span style="font-size:0.78rem;">{{ 'Active' if photo.is_active else 'Hidden' }}</span>
+              </div>
+            </button>
+            <!-- Delete -->
+            <form method="POST" action="{{ url_for('admin.delete_ambience', photo_id=photo.id) }}"
+                  data-confirm="Delete '{{ photo.title }}'? This cannot be undone.">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+              <button type="submit" class="btn btn-danger btn-sm" title="Delete">🗑</button>
+            </form>
+          </div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div style="text-align:center;padding:3rem;color:var(--color-brown-600);">
+      <div style="font-size:3rem;margin-bottom:1rem;">📷</div>
+      <p>No photos uploaded yet. Use the form above to add your first ambience photo!</p>
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,99 @@
+{% extends "admin/base_admin.html" %}
+{% block title %}Dashboard — Viraamam Admin{% endblock %}
+
+{% block content %}
+<h1 class="admin-page-title">Dashboard</h1>
+<p class="admin-page-subtitle">Today's overview — {{ now.strftime('%B %d, %Y') if now else '' }}</p>
+
+<!-- Metric Cards -->
+<div class="metrics-grid">
+  <div class="metric-card success-card">
+    <div class="metric-label">Today's Orders</div>
+    <div class="metric-value">{{ today_orders }}</div>
+    <div class="metric-sub">Orders placed today</div>
+  </div>
+  <div class="metric-card">
+    <div class="metric-label">Today's Revenue</div>
+    <div class="metric-value">₹{{ "%.0f"|format(today_revenue|float) }}</div>
+    <div class="metric-sub">From paid & completed</div>
+  </div>
+  <div class="metric-card warning-card">
+    <div class="metric-label">Low Stock Items</div>
+    <div class="metric-value">{{ low_stock }}</div>
+    <div class="metric-sub">≤ 5 units remaining</div>
+  </div>
+  <div class="metric-card danger-card">
+    <div class="metric-label">Out of Stock</div>
+    <div class="metric-value">{{ out_of_stock }}</div>
+    <div class="metric-sub">Items with 0 units</div>
+  </div>
+  <div class="metric-card">
+    <div class="metric-label">Active Items</div>
+    <div class="metric-value">{{ total_items }}</div>
+    <div class="metric-sub">On the menu</div>
+  </div>
+</div>
+
+<!-- Quick Actions -->
+<div style="display:flex;gap:1rem;margin-bottom:2rem;flex-wrap:wrap;">
+  <a href="{{ url_for('admin.add_item') }}" class="btn btn-primary btn-sm">+ Add Item</a>
+  <a href="{{ url_for('admin.ambience_admin') }}" class="btn btn-ghost btn-sm">📷 Upload Ambience</a>
+  <a href="{{ url_for('admin.advertisements') }}" class="btn btn-ghost btn-sm">📢 Manage Ads</a>
+  <a href="{{ url_for('admin.orders') }}" class="btn btn-ghost btn-sm">📦 View Orders</a>
+</div>
+
+<!-- Recent Orders -->
+<div class="admin-card">
+  <div class="admin-card-header">
+    <span class="admin-card-title">Recent Orders</span>
+    <a href="{{ url_for('admin.orders') }}" class="btn btn-ghost btn-sm">View All</a>
+  </div>
+  <div class="table-wrap">
+    <table id="recent-orders-table">
+      <thead>
+        <tr>
+          <th>Order #</th>
+          <th>Customer</th>
+          <th>Amount</th>
+          <th>Status</th>
+          <th>Date</th>
+          <th>Action</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for order in recent_orders %}
+        <tr>
+          <td><strong>#{{ order.id }}</strong></td>
+          <td>{{ order.user.name if order.user else '—' }}</td>
+          <td>₹{{ "%.2f"|format(order.total_amount|float) }}</td>
+          <td><span class="status-badge status-{{ order.status }}">{{ order.status }}</span></td>
+          <td style="font-size:0.82rem;color:var(--color-brown-600);">{{ order.created_at.strftime('%d %b, %H:%M') }}</td>
+          <td>
+            <form method="POST" action="{{ url_for('admin.update_order_status', order_id=order.id) }}" style="display:flex;gap:0.4rem;">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+              <select name="status" class="form-control" style="padding:0.3rem 0.5rem;font-size:0.8rem;height:auto;">
+                {% for s in ['pending','paid','preparing','completed','cancelled'] %}
+                <option value="{{ s }}" {% if order.status == s %}selected{% endif %}>{{ s|capitalize }}</option>
+                {% endfor %}
+              </select>
+              <button type="submit" class="btn btn-ghost btn-sm">✓</button>
+            </form>
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="6" style="text-align:center;padding:2rem;color:var(--color-brown-600);">No orders yet today.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+// Inject date
+document.querySelectorAll('[data-date]').forEach(el => {
+  el.textContent = new Date().toLocaleDateString('en-IN', { weekday:'long', year:'numeric', month:'long', day:'numeric' });
+});
+</script>
+{% endblock %}

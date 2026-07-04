@@ -1,0 +1,96 @@
+{% extends "base.html" %}
+{% block title %}Register — Viraamam Cafe{% endblock %}
+
+{% block content %}
+<div class="auth-page">
+  <div class="auth-card" style="max-width:460px;">
+    <div class="auth-logo">
+      <h1>Viraama<span>m</span></h1>
+      <p class="auth-subtitle">Create your account to start ordering ☕</p>
+    </div>
+
+    <form method="POST" action="{{ url_for('auth.register') }}" novalidate id="register-form">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+
+      <div class="form-group">
+        <label class="form-label" for="name">Full Name</label>
+        <input type="text" id="name" name="name" class="form-control"
+               placeholder="Your name" required autocomplete="name"
+               value="{{ request.form.get('name', '') }}" />
+      </div>
+
+      <div class="form-group">
+        <label class="form-label" for="email">Email</label>
+        <input type="email" id="email" name="email" class="form-control"
+               placeholder="you@example.com" required autocomplete="email"
+               value="{{ request.form.get('email', '') }}" />
+      </div>
+
+      <div class="form-group">
+        <label class="form-label" for="phone">Phone (optional)</label>
+        <input type="tel" id="phone" name="phone" class="form-control"
+               placeholder="+91 98765 43210" autocomplete="tel"
+               value="{{ request.form.get('phone', '') }}" />
+      </div>
+
+      <div class="form-group">
+        <label class="form-label" for="password">Password</label>
+        <input type="password" id="password" name="password" class="form-control"
+               placeholder="At least 8 characters" required autocomplete="new-password" />
+        <!-- Strength meter -->
+        <div id="strength-bar" style="height:4px;background:var(--color-cream-200);border-radius:2px;margin-top:0.5rem;overflow:hidden;">
+          <div id="strength-fill" style="height:100%;width:0;transition:width 0.3s,background 0.3s;border-radius:2px;"></div>
+        </div>
+        <div id="strength-label" class="form-hint"></div>
+      </div>
+
+      <button type="submit" class="btn btn-primary" style="width:100%;justify-content:center;margin-top:0.5rem;" id="reg-btn">
+        Create Account
+      </button>
+    </form>
+
+    <div class="auth-divider">or</div>
+
+    <p style="text-align:center;font-size:0.9rem;color:var(--color-brown-600);">
+      Already have an account?
+      <a href="{{ url_for('auth.login') }}" style="font-weight:600;">Sign in</a>
+    </p>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+const pw = document.getElementById('password');
+const fill = document.getElementById('strength-fill');
+const label = document.getElementById('strength-label');
+
+pw?.addEventListener('input', () => {
+  const v = pw.value;
+  let score = 0;
+  if (v.length >= 8) score++;
+  if (/[A-Z]/.test(v)) score++;
+  if (/[0-9]/.test(v)) score++;
+  if (/[^A-Za-z0-9]/.test(v)) score++;
+  const levels = [
+    { w: '0%', bg: '', text: '' },
+    { w: '25%', bg: '#dc3545', text: 'Weak' },
+    { w: '50%', bg: '#fd7e14', text: 'Fair' },
+    { w: '75%', bg: '#ffc107', text: 'Good' },
+    { w: '100%', bg: '#198754', text: 'Strong' },
+  ];
+  const lvl = levels[score] || levels[0];
+  fill.style.width = lvl.w;
+  fill.style.background = lvl.bg;
+  label.textContent = lvl.text;
+});
+
+document.getElementById('register-form')?.addEventListener('submit', function() {
+  const btn = document.getElementById('reg-btn');
+  if (btn) {
+    btn.textContent = 'Creating account…';
+    setTimeout(() => { btn.disabled = true; }, 50);
+  }
+});
+</script>
+{% endblock %}

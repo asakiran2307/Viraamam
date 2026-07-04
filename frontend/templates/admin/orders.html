@@ -1,0 +1,92 @@
+{% extends "admin/base_admin.html" %}
+{% block title %}Orders — Viraamam Admin{% endblock %}
+
+{% block content %}
+<h1 class="admin-page-title">Orders</h1>
+<p class="admin-page-subtitle">Manage all customer orders. Update status as you prepare and complete each order.</p>
+
+<!-- Status Filter -->
+<div class="admin-card" style="margin-bottom:1.5rem;">
+  <div style="padding:1rem 1.5rem;display:flex;gap:0.5rem;flex-wrap:wrap;align-items:center;">
+    <span style="font-size:0.88rem;font-weight:600;color:var(--color-brown-700);margin-right:0.5rem;">Filter:</span>
+    <a href="{{ url_for('admin.orders') }}" class="pill {% if not current_status %}active{% endif %}">All</a>
+    {% for s in ['pending', 'paid', 'preparing', 'completed', 'cancelled'] %}
+    <a href="{{ url_for('admin.orders', status=s) }}" class="pill {% if current_status == s %}active{% endif %}">{{ s|capitalize }}</a>
+    {% endfor %}
+  </div>
+</div>
+
+<!-- Orders Table -->
+<div class="admin-card">
+  <div class="admin-card-header">
+    <span class="admin-card-title">Orders ({{ pagination.total }})</span>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Order #</th>
+          <th>Customer</th>
+          <th>Items</th>
+          <th>Total</th>
+          <th>Status</th>
+          <th>Date</th>
+          <th>Update Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for order in orders %}
+        <tr>
+          <td><strong>#{{ order.id }}</strong></td>
+          <td>
+            <div style="font-weight:600;">{{ order.user.name if order.user else '—' }}</div>
+            <div style="font-size:0.78rem;color:var(--color-brown-600);">{{ order.user.email if order.user else '' }}</div>
+          </td>
+          <td>
+            {% for oi in order.order_items[:2] %}
+            <div style="font-size:0.82rem;">{{ oi.item.name if oi.item else '—' }} × {{ oi.quantity }}</div>
+            {% endfor %}
+            {% if order.order_items|length > 2 %}
+            <div style="font-size:0.78rem;color:var(--color-brown-600);">+ {{ order.order_items|length - 2 }} more</div>
+            {% endif %}
+          </td>
+          <td><strong>₹{{ "%.2f"|format(order.total_amount|float) }}</strong></td>
+          <td><span class="status-badge status-{{ order.status }}">{{ order.status }}</span></td>
+          <td style="font-size:0.82rem;color:var(--color-brown-600);">
+            {{ order.created_at.strftime('%d %b %Y') }}<br>
+            <span style="font-size:0.78rem;">{{ order.created_at.strftime('%H:%M') }}</span>
+          </td>
+          <td>
+            <form method="POST" action="{{ url_for('admin.update_order_status', order_id=order.id) }}"
+                  style="display:flex;gap:0.4rem;align-items:center;">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+              <select name="status" class="form-control" style="padding:0.3rem 0.5rem;font-size:0.8rem;height:auto;width:auto;">
+                {% for s in ['pending', 'paid', 'preparing', 'completed', 'cancelled'] %}
+                <option value="{{ s }}" {% if order.status == s %}selected{% endif %}>{{ s|capitalize }}</option>
+                {% endfor %}
+              </select>
+              <button type="submit" class="btn btn-ghost btn-sm">Update</button>
+            </form>
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="7" style="text-align:center;padding:2rem;color:var(--color-brown-600);">No orders found.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Pagination -->
+  {% if pagination.pages > 1 %}
+  <div style="padding:1rem 1.5rem;display:flex;gap:0.5rem;align-items:center;">
+    {% if pagination.has_prev %}
+    <a href="{{ url_for('admin.orders', page=pagination.prev_num, status=current_status) }}" class="btn btn-ghost btn-sm">‹ Prev</a>
+    {% endif %}
+    <span style="font-size:0.85rem;color:var(--color-brown-600);">Page {{ pagination.page }} of {{ pagination.pages }}</span>
+    {% if pagination.has_next %}
+    <a href="{{ url_for('admin.orders', page=pagination.next_num, status=current_status) }}" class="btn btn-ghost btn-sm">Next ›</a>
+    {% endif %}
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

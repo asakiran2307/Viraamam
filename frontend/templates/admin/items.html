@@ -1,0 +1,101 @@
+{% extends "admin/base_admin.html" %}
+{% block title %}Menu Items — Viraamam Admin{% endblock %}
+
+{% block content %}
+<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.5rem;flex-wrap:wrap;gap:1rem;">
+  <div>
+    <h1 class="admin-page-title">Menu Items</h1>
+    <p class="admin-page-subtitle">Manage your cafe's offerings — add, edit, or deactivate items.</p>
+  </div>
+  <a href="{{ url_for('admin.add_item') }}" class="btn btn-primary">+ Add Item</a>
+</div>
+
+<!-- Search -->
+<div class="admin-card" style="margin-bottom:1.5rem;">
+  <div style="padding:1rem 1.5rem;">
+    <form method="GET" action="{{ url_for('admin.items') }}" style="display:flex;gap:0.75rem;align-items:center;">
+      <input type="search" name="q" value="{{ search }}" placeholder="Search items…" class="form-control" style="max-width:300px;" id="item-search" />
+      <button type="submit" class="btn btn-ghost btn-sm">Search</button>
+      {% if search %}<a href="{{ url_for('admin.items') }}" class="btn btn-ghost btn-sm">Clear</a>{% endif %}
+    </form>
+  </div>
+</div>
+
+<!-- Items Table -->
+<div class="admin-card">
+  <div class="admin-card-header">
+    <span class="admin-card-title">All Items ({{ pagination.total }})</span>
+  </div>
+  <div class="table-wrap">
+    <table id="items-table">
+      <thead>
+        <tr>
+          <th>Image</th>
+          <th>Name</th>
+          <th>Category</th>
+          <th>Price</th>
+          <th>Stock</th>
+          <th>Status</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for item in items %}
+        <tr>
+          <td>
+            {% if item.image_data %}
+            <img src="{{ url_for('admin.item_image', item_id=item.id) }}" alt="{{ item.name }}"
+                 style="width:52px;height:52px;object-fit:cover;border-radius:var(--radius-sm);" />
+            {% else %}
+            <div style="width:52px;height:52px;background:var(--color-cream-200);border-radius:var(--radius-sm);display:flex;align-items:center;justify-content:center;font-size:1.5rem;">☕</div>
+            {% endif %}
+          </td>
+          <td><strong>{{ item.name }}</strong></td>
+          <td>{{ item.category.name if item.category else '—' }}</td>
+          <td>₹{{ "%.2f"|format(item.price|float) }}</td>
+          <td>
+            {% if item.stock_quantity == 0 %}
+            <span class="status-badge status-cancelled">Out of stock</span>
+            {% elif item.low_stock %}
+            <span class="status-badge status-pending">{{ item.stock_quantity }} left</span>
+            {% else %}
+            <span style="font-weight:600;color:var(--color-success);">{{ item.stock_quantity }}</span>
+            {% endif %}
+          </td>
+          <td>
+            {% if item.is_active %}
+            <span class="status-badge status-paid">Active</span>
+            {% else %}
+            <span class="status-badge status-cancelled">Inactive</span>
+            {% endif %}
+          </td>
+          <td style="white-space:nowrap;">
+            <a href="{{ url_for('admin.edit_item', item_id=item.id) }}" class="btn btn-ghost btn-sm">Edit</a>
+            <form method="POST" action="{{ url_for('admin.delete_item', item_id=item.id) }}"
+                  style="display:inline;" data-confirm="Deactivate '{{ item.name }}'?">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+              <button type="submit" class="btn btn-danger btn-sm">Deactivate</button>
+            </form>
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="7" style="text-align:center;padding:2rem;color:var(--color-brown-600);">No items found.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Pagination -->
+  {% if pagination.pages > 1 %}
+  <div style="padding:1rem 1.5rem;display:flex;gap:0.5rem;align-items:center;">
+    {% if pagination.has_prev %}
+    <a href="{{ url_for('admin.items', page=pagination.prev_num, q=search) }}" class="btn btn-ghost btn-sm">‹ Prev</a>
+    {% endif %}
+    <span style="font-size:0.85rem;color:var(--color-brown-600);">Page {{ pagination.page }} of {{ pagination.pages }}</span>
+    {% if pagination.has_next %}
+    <a href="{{ url_for('admin.items', page=pagination.next_num, q=search) }}" class="btn btn-ghost btn-sm">Next ›</a>
+    {% endif %}
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

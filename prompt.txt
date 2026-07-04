@@ -1,0 +1,329 @@
+# PROMPT: Full-Stack Cafe Ordering Platform (Production-Grade)
+
+Use this prompt with your AI coding assistant (Claude Code, Cursor, etc.) or as a spec for your own build. Follow it step by step, in order — don't skip ahead. Section 5 (Security) and step 16 of the build order (Security Testing Pass) assume you're testing against your own local/dev deployment only.
+
+---
+
+## 0. Non-Negotiable Ground Rules
+
+- **Never hardcode secrets.** DB URL, Razorpay keys, JWT secret, admin credentials — all go in a `.env` file, loaded via `python-dotenv`. `.env` must be in `.gitignore`.
+- **No inline `<script>` spaghetti.** Real project structure: separated concerns (models, routes/blueprints, services, templates/static or a separate frontend build).
+- **No `SELECT *`.** Every query selects explicit columns needed.
+- **Every list endpoint is paginated.** No unbounded queries — this is what breaks at 1000+ concurrent users.
+- **Every table has indexes** on foreign keys and frequently filtered columns.
+
+---
+
+## 1. Tech Stack
+
+| Layer | Choice |
+|---|---|
+| Backend | Python Flask (application factory pattern + Blueprints) |
+| ORM | SQLAlchemy + Flask-Migrate (Alembic) |
+| Database | Neon PostgreSQL (serverless, pooled connection) |
+| Caching | Redis (for session store, item catalog cache, rate limiting) |
+| Auth | Flask-Login or JWT (flask-jwt-extended) with bcrypt password hashing |
+| Payments | Razorpay Orders API + webhook verification |
+| Frontend | HTML5 + Tailwind CSS + vanilla JS (or React if you want SPA) |
+| 3D/Animation | Three.js (hero section 3D elements) + GSAP (scroll/entrance animations) + Swiper.js (auto-scroll ad/item carousel) |
+| Image storage | PostgreSQL `BYTEA` column — images stored directly in the DB (per requirement), served via a dedicated Flask route |
+| Task queue | Celery + Redis (for emails, order confirmations, stock updates) |
+| WSGI server | Gunicorn with gevent/eventlet workers behind Nginx |
+| Deployment | Docker + docker-compose (app, redis, nginx) |
+
+---
+
+## 2. Project Structure
+
+```
+cafe-platform/
+├── backend/
+│   ├── app/
+│   │   ├── __init__.py            # app factory
+│   │   ├── config.py              # env-based config classes
+│   │   ├── extensions.py          # db, migrate, login_manager, cache, celery init
+│   │   ├── models/
+│   │   │   ├── user.py
+│   │   │   ├── item.py
+│   │   │   ├── category.py
+│   │   │   ├── order.py
+│   │   │   ├── order_item.py
+│   │   │   ├── advertisement.py
+│   │   │   └── payment.py
+│   │   ├── routes/
+│   │   │   ├── auth.py            # register/login/logout/refresh
+│   │   │   ├── items.py           # public item listing/details
+│   │   │   ├── admin.py           # admin-only CRUD, protected
+│   │   │   ├── cart.py
+│   │   │   ├── orders.py
+│   │   │   ├── payments.py        # razorpay order create + webhook
+│   │   │   └── ads.py
+│   │   ├── services/
+│   │   │   ├── item_service.py
+│   │   │   ├── order_service.py
+│   │   │   ├── payment_service.py
+│   │   │   ├── image_service.py   # read bytes on upload, serve via Response()
+│   │   │   └── stock_service.py   # atomic stock decrement
+│   │   ├── schemas/                # marshmallow/pydantic validation schemas
+│   │   ├── utils/
+│   │   │   ├── decorators.py       # @admin_required, @rate_limit
+│   │   │   └── errors.py           # centralized error handlers
+│   │   └── tasks.py                # celery tasks
+│   ├── migrations/
+│   ├── tests/
+│   ├── .env.example
+│   ├── requirements.txt
+│   └── wsgi.py
+├── frontend/
+│   ├── static/
+│   │   ├── css/
+│   │   ├── js/
+│   │   │   ├── carousel.js
+│   │   │   ├── three-hero.js
+│   │   │   ├── cart.js
+│   │   │   └── checkout.js
+│   │   └── assets/
+│   └── templates/
+│       ├── base.html
+│       ├── index.html
+│       ├── item_detail.html
+│       ├── cart.html
+│       ├── checkout.html
+│       ├── admin/
+│       │   ├── dashboard.html
+│       │   ├── add_item.html
+│       │   └── manage_items.html
+│       └── auth/
+│           ├── login.html
+│           └── register.html
+├── docker-compose.yml
+└── README.md
+```
+
+---
+
+## 3. Database Schema (Neon Postgres)
+
+Design these tables with proper types, constraints, and indexes:
+
+**users**
+`id (PK), name, email (unique, indexed), password_hash, role (enum: 'customer','admin'), phone, created_at, is_active`
+
+**categories**
+`id (PK), name, slug (unique)`
+
+**items**
+`id (PK), name, description (text), price (numeric(10,2)), stock_quantity (int), category_id (FK, indexed), image_data (BYTEA), image_mime_type (varchar), is_active (bool), created_at, updated_at`
+→ Add a **check constraint** `stock_quantity >= 0`.
+
+**advertisements**
+`id (PK), item_id (FK, nullable), title, image_data (BYTEA), image_mime_type (varchar), display_order (int, indexed), is_active (bool), start_date, end_date`
+→ This table drives the auto-scrolling banner. Admin toggles `is_active` and sets `display_order`.
+
+**orders**
+`id (PK), user_id (FK, indexed), total_amount, status (enum: pending/paid/preparing/completed/cancelled), razorpay_order_id, razorpay_payment_id, created_at`
+
+**order_items**
+`id (PK), order_id (FK, indexed), item_id (FK), quantity, price_at_purchase`
+
+**payments**
+`id (PK), order_id (FK, indexed), razorpay_order_id, razorpay_payment_id, razorpay_signature, amount, status, verified_at`
+
+Use **connection pooling** via SQLAlchemy engine options (`pool_size`, `max_overflow`, `pool_pre_ping=True`) tuned for Neon's pooled connection endpoint — always connect through Neon's `-pooler` host, never the direct host, for a web app expecting concurrent traffic.
+
+---
+
+## 4. Core Feature Requirements
+
+### 4.1 Authentication
+- Customer registration/login with bcrypt-hashed passwords.
+- Separate **admin account** (seeded via a CLI command, e.g. `flask create-admin`), never registerable through the public form.
+- Session via JWT access + refresh tokens, or secure server-side session with Redis backing — pick one and be consistent.
+- Rate-limit login attempts (Flask-Limiter) to block brute force.
+
+### 4.2 Admin Panel
+- Add / edit / delete items with image upload — file bytes read via `file.read()` and stored directly in the `image_data` column, alongside `image_mime_type`.
+- Set/update stock quantity.
+- Create advertisements: pick an existing item + banner image + display order + active window (start/end date).
+- Dashboard: total orders today, revenue, low-stock alerts (items below a threshold).
+- All admin routes protected by `@admin_required` decorator checking `role == 'admin'`.
+
+### 4.3 Public Storefront
+- Homepage hero with a subtle Three.js 3D element (e.g., rotating coffee cup or floating beans) — keep it lightweight, lazy-load the Three.js bundle.
+- **Auto-scrolling advertisement carousel** (Swiper.js, autoplay + loop) pulling only `is_active=true` ads within their date window, ordered by `display_order`.
+- Item catalog: paginated grid, filter by category, search by name.
+- Item detail page shows: image, price, **remaining stock** (and "Out of stock" state disabling add-to-cart when 0), and a short description.
+- Cart persisted per logged-in user (server-side, not just localStorage) so it survives across devices.
+- GSAP scroll-reveal animations on cards, smooth page transitions.
+
+### 4.4 Checkout & Razorpay
+- Backend creates a Razorpay Order (`/orders` API) with the cart total.
+- Frontend opens Razorpay Checkout widget with that `order_id`.
+- On success, frontend sends `razorpay_payment_id`, `razorpay_order_id`, `razorpay_signature` to your backend.
+- Backend **verifies the signature server-side** using Razorpay's HMAC verification — never trust the frontend's "payment succeeded" claim alone.
+- Use a **webhook** (`/webhooks/razorpay`) as the source of truth for payment confirmation, since client-side callbacks can be missed.
+- On confirmed payment: atomically decrement `stock_quantity` per item (use `SELECT ... FOR UPDATE` or a single `UPDATE items SET stock = stock - :qty WHERE id = :id AND stock >= :qty` to prevent overselling under concurrent orders), then mark order `paid`.
+
+### 4.5 Scaling for 1000+ Concurrent Users
+- Gunicorn with multiple worker processes + `gevent` worker class for I/O-bound concurrency; put Nginx in front as reverse proxy + static file server.
+- Cache the item catalog and active-ads list in Redis with short TTL (e.g. 60s), invalidate on admin write.
+- Use Neon's pooled connection string (PgBouncer-backed) so Flask's SQLAlchemy pool doesn't exhaust Neon's connection limit.
+- Add composite indexes for hot queries (e.g. `items(category_id, is_active)`).
+- Since images live in Postgres, add HTTP caching headers (`Cache-Control`, `ETag`) on the image-serving route so browsers don't re-fetch the same bytes every request — this matters more here than with a CDN.
+- Move slow work (order confirmation emails, receipt generation) to Celery background tasks so request threads stay fast.
+- Add `Cache-Control` headers on static assets; enable Gzip/Brotli in Nginx.
+
+---
+
+## 5. Security Requirements (Non-Negotiable — Build These In From Step 1, Not After)
+
+> Note: these are standard defensive practices for hardening your own application — apply them as you build, in your own dev/test environment.
+
+### 5.1 SQL Injection
+- Use SQLAlchemy ORM methods (`filter_by`, `filter`, bound parameters) everywhere. **Never** build queries with f-strings or `%` string formatting containing user input.
+- If raw SQL is ever unavoidable, use `text("... WHERE id = :id")` with `.bindparams(id=value)` — never inline the value.
+
+### 5.2 Price / Order Tampering
+- The frontend's displayed price is **cosmetic only**. On checkout, the backend must re-fetch each item's `price` from the DB and recompute the order total server-side — never accept a `total_amount` sent by the client.
+- Same rule for quantity vs. stock: validate `quantity <= stock_quantity` server-side at order-creation time, again atomically at payment-confirmation time (race condition between the two).
+- Razorpay order amount must be created from this server-computed total, not a client-supplied number.
+
+### 5.3 CSRF (Cross-Site Request Forgery)
+- Use `Flask-WTF`'s CSRF protection on every state-changing form (`{{ csrf_token() }}` in templates).
+- For JSON/AJAX APIs: set cookies with `SameSite=Strict` (or `Lax` minimum) + `Secure` + `HttpOnly`, and require a custom header (e.g. `X-Requested-With`) on state-changing requests — browsers won't auto-attach custom headers on cross-site forged requests.
+
+### 5.4 XSS (Cross-Site Scripting)
+- Rely on Jinja2's default auto-escaping. **Never** use the `| safe` filter on any user-supplied field (item descriptions if editable by non-admins, review text, names, etc.).
+- Sanitize any rich-text input server-side (e.g. `bleach`) if you ever allow HTML in descriptions.
+- Set a `Content-Security-Policy` header restricting script sources to your own domain.
+
+### 5.5 Authentication & Session Hardening
+- Bcrypt for password hashing with a proper work factor (`bcrypt.gensalt(rounds=12)` or higher).
+- Cookies: `Secure`, `HttpOnly`, `SameSite=Lax/Strict`.
+- Short-lived JWT access tokens (e.g. 15 min) + longer-lived rotating refresh tokens stored server-side (so they can be revoked).
+- Rate-limit and lock out after repeated failed logins (Flask-Limiter, e.g. 5 attempts / 15 min per IP+email).
+- Never leak whether an email exists in error messages ("invalid credentials", not "email not found").
+
+### 5.6 File Upload Validation (Critical Now That Images Live in the DB)
+- Validate MIME type **and** magic bytes (`python-magic` or Pillow's `Image.open().verify()`), not just the file extension.
+- Cap upload size (e.g. `MAX_CONTENT_LENGTH` in Flask config) to prevent DB bloat / DoS via huge uploads.
+- **Re-encode** the image server-side with Pillow before storing (`Image.open(file).save(buffer, format="JPEG")`) rather than storing the raw uploaded bytes as-is — this strips any malicious payload some crafted image files smuggle in metadata.
+- Reject SVG uploads unless you sanitize them separately (SVGs can contain embedded `<script>`).
+
+### 5.7 Payment Integrity
+- Verify Razorpay's HMAC signature **server-side** on every payment callback — never trust a frontend "success" message alone.
+- Treat the Razorpay **webhook** as the source of truth for marking an order paid, since client-side JS callbacks can fail to fire (browser closed, network drop) even after a real charge succeeded.
+- Verify the webhook's own signature (`X-Razorpay-Signature` header) using `RAZORPAY_WEBHOOK_SECRET` before trusting its payload.
+- Make webhook handling **idempotent** (check if the order is already marked `paid` before reprocessing) since providers may retry delivery.
+
+### 5.8 Transport & HTTP Headers
+- Force HTTPS everywhere (redirect HTTP → HTTPS at Nginx).
+- Use `flask-talisman` to set: `Strict-Transport-Security`, `X-Frame-Options: DENY` (clickjacking), `X-Content-Type-Options: nosniff`, `Content-Security-Policy`.
+- Disable Flask's debug mode and default error pages in production (`FLASK_ENV=production`, custom error handlers so stack traces never leak to users).
+
+### 5.9 Access Control
+- Every admin route re-checks `role == 'admin'` server-side on each request — never rely on hiding UI buttons as the only protection (IDOR-style privilege escalation is one of the most common real-world findings).
+- Every "my order" / "my cart" endpoint checks `order.user_id == current_user.id` before returning data — prevents one user from viewing another's order by guessing IDs.
+
+### 5.10 Dependency & Config Hygiene
+- Pin dependency versions in `requirements.txt`; run `pip-audit` periodically to catch known CVEs.
+- Never commit `.env`; rotate any secret that's ever been exposed (chat logs, screenshots, git history).
+- Log security-relevant events (failed logins, admin actions) but never log full card numbers, passwords, or Razorpay secrets.
+
+---
+
+## 6. UI/UX Plan
+
+### 6.1 Design Language
+- Warm, appetite-appealing palette: deep coffee brown (`#3C2A21`), cream (`#F5EBDD`), an accent (burnt orange or muted gold) for CTAs.
+- Typography: a serif or rounded display font for headings (warmth, "cafe" feel), clean sans-serif for body text.
+- Generous whitespace, rounded corners (8–16px) on cards, soft shadows — avoid a "corporate SaaS" look.
+
+### 6.2 Homepage
+1. **Hero section** — full-width, subtle Three.js 3D element (rotating coffee cup / steam particles), headline + CTA ("Order Now"), lazy-loaded so it doesn't block first paint.
+2. **Auto-scrolling ad carousel** directly below the hero — full-bleed banner strip, Swiper autoplay (~4s interval), pause on hover, dots + swipe support on mobile.
+3. **Category quick-filters** — horizontally scrollable pill buttons (Coffee, Pastries, Snacks…).
+4. **Featured/Popular items grid** — 3–4 columns desktop, 2 columns tablet, 1 column mobile, GSAP fade-up on scroll.
+5. **Footer** — hours, location map embed, socials.
+
+### 6.3 Item Catalog Page
+- Sticky filter bar (category + search) at top.
+- Grid of item cards: image, name, price, stock badge ("Only 3 left" in amber when low, "Out of stock" greyed out when 0).
+- Skeleton loaders while paginated data fetches — never a blank white flash.
+- Infinite scroll or "Load more" button rather than traditional pagination, for a more app-like feel.
+
+### 6.4 Item Detail Page
+- Large image left (or top on mobile), details right: name, price, stock count, description, quantity stepper, "Add to Cart" button.
+- Add-to-cart triggers a small toast/slide-in confirmation, not a jarring page reload.
+- Disable the button entirely and show "Out of Stock" state when `stock_quantity == 0`.
+
+### 6.5 Cart & Checkout
+- Slide-in cart drawer (not a separate page) for quick edits — quantity +/-, remove item, live-updating total.
+- Checkout page: order summary → Razorpay widget launch → success/failure state clearly shown, with an order confirmation screen showing order ID and status.
+- Never let users think a payment succeeded until the backend confirms via webhook — show a "Verifying payment…" loading state if there's any delay.
+
+### 6.6 Auth Screens
+- Minimal, centered card layout for login/register — no distracting hero imagery competing with the form.
+- Inline validation (email format, password strength) before submit, not just after.
+
+### 6.7 Admin Panel (Distinct Visual Identity from the Storefront)
+- Sidebar navigation: Dashboard, Items, Advertisements, Orders.
+- Dashboard: key metric cards (today's orders, revenue, low-stock count) at a glance.
+- Item management: data table with inline edit, image thumbnail preview, stock quick-adjust, search/filter.
+- Advertisement management: drag-to-reorder list (maps to `display_order`), toggle switch for `is_active`, date-range picker for the active window.
+- Keep the admin UI fast and information-dense — this is a work tool, not a marketing surface, so fewer animations here than the storefront.
+
+### 6.8 Motion & Animation Guidelines
+- GSAP for scroll-triggered fade/slide-ins on cards and sections — subtle, ~300-500ms, avoid anything that delays perceived load time.
+- Three.js reserved for the homepage hero only — don't scatter 3D elements across every page, it'll hurt performance on 1000+ concurrent users' devices, especially mobile.
+- Page transitions: soft fade (150-200ms) between routes, not hard cuts.
+- Respect `prefers-reduced-motion` — disable non-essential animation for users who've set that OS-level preference.
+
+### 6.9 Responsiveness & Accessibility
+- Mobile-first breakpoints (Tailwind's default `sm/md/lg/xl` scale is fine).
+- Sufficient color contrast (WCAG AA) even with the brown/cream palette — check contrast ratios on CTA buttons specifically.
+- All interactive elements keyboard-navigable; images have `alt` text (item name works well here).
+
+---
+
+## 7. Environment Variables (`.env.example` — fill with your real values locally, never commit)
+
+```
+FLASK_ENV=production
+SECRET_KEY=
+DATABASE_URL=postgresql://<user>:<password>@<neon-pooler-host>/<db>?sslmode=require&channel_binding=require
+REDIS_URL=redis://localhost:6379/0
+RAZORPAY_KEY_ID=
+RAZORPAY_KEY_SECRET=
+RAZORPAY_WEBHOOK_SECRET=
+JWT_SECRET_KEY=
+ADMIN_SEED_EMAIL=
+ADMIN_SEED_PASSWORD=
+```
+
+---
+
+## 8. Build Order (do it in this exact sequence — security is built in at each step, not bolted on at the end)
+
+1. **Scaffold** the Flask app factory + config + `.env` loading. Confirm DB connects to Neon (pooler host). Set `FLASK_ENV`, disable debug mode for anything beyond local testing.
+2. **Models & migrations** — define all SQLAlchemy models (including `image_data`/`image_mime_type` as BYTEA) + run first Alembic migration.
+3. **Auth** — register/login/logout with bcrypt hashing, rate-limited login attempts, secure cookie flags, seed-admin CLI command (admin is never publicly registerable).
+4. **Access control decorators** — `@admin_required`, `@owner_required` (for "this order belongs to this user") before writing a single admin or order route, so every route born after this point is protected by default.
+5. **Item + category CRUD** (admin routes first, since public browsing depends on data existing) — using ORM methods only, no raw SQL.
+6. **Image upload/serve flow** — validate MIME + magic bytes, re-encode via Pillow, enforce `MAX_CONTENT_LENGTH`, store into `image_data`; add `/items/<id>/image` route returning bytes with correct `Content-Type` + caching headers.
+7. **Advertisement CRUD** + public endpoint returning active ads within their date window.
+8. **Public storefront UI** — home (hero + carousel), catalog (filters, pagination, skeleton loaders), item detail — wire real data, no mock JSON. Apply the UI/UX plan from Section 6.
+9. **CSRF protection** wired into every form/AJAX call before building cart/checkout (easy to forget if added later).
+10. **Cart (server-side)** + checkout flow, with server-side total recalculation from live DB prices (never trust client-sent totals).
+11. **Razorpay integration** — order creation using the server-computed total, checkout widget, signature verification, webhook with its own signature check + idempotent handling.
+12. **Stock decrement logic** with concurrency-safe atomic update (`UPDATE ... WHERE stock >= :qty`) to prevent overselling and quantity tampering.
+13. **Security headers & hardening pass** — `flask-talisman`, CSP, HSTS, `X-Frame-Options`, force HTTPS, custom error pages hiding stack traces.
+14. **Redis caching + Celery** for background tasks (emails, receipts) and catalog/ad caching.
+15. **Motion polish** — Three.js hero, GSAP scroll animations, Swiper carousel — added last, after functionality and security are solid, respecting `prefers-reduced-motion`.
+16. **Security testing pass** (in your own environment) — try SQLi payloads against every input field, attempt to submit a tampered price/quantity via browser devtools, test CSRF token absence, attempt admin routes as a normal user, fuzz the file upload with non-image files renamed to `.jpg`.
+17. **Load + functional tests** — Locust targeting 1000+ simulated concurrent users; unit tests for auth, checkout, and stock-concurrency logic.
+18. **Dockerize** + Nginx config + final deploy checklist (HTTPS cert, env vars set, debug off, rotated secrets).
+
+---
+
+**When you hand this to a coding assistant, paste it in as-is and add: "Start with step 1 only, show me the code, wait for my confirmation before moving to the next step."** That keeps it from generating a wall of half-correct code in one shot.

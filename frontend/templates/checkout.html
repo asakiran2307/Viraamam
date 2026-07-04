@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+{% block title %}Checkout — Viraamam Cafe{% endblock %}
+
+{% block content %}
+<div style="padding-top:70px;">
+<section class="checkout-page">
+  <div class="container">
+    <h1 style="font-family:var(--font-display);font-size:2rem;color:var(--color-brown-800);margin-bottom:0.5rem;">Complete Your Order</h1>
+    <p style="color:var(--color-brown-600);margin-bottom:2rem;">Review your order and pay securely with Razorpay.</p>
+
+    <div class="checkout-grid">
+      <!-- Order Summary -->
+      <div>
+        <div class="checkout-summary">
+          <h2 style="font-family:var(--font-display);font-size:1.2rem;color:var(--color-brown-800);margin-bottom:1rem;">Order Summary</h2>
+          {% for ci in cart_items %}
+          <div class="checkout-item">
+            {% if ci.item.image_data %}
+            <img class="checkout-item-img" src="{{ url_for('items.image', item_id=ci.item.id) }}" alt="{{ ci.item.name }}" />
+            {% else %}
+            <div class="checkout-item-img" style="background:var(--color-cream-200);display:flex;align-items:center;justify-content:center;font-size:1.5rem;">☕</div>
+            {% endif %}
+            <div style="flex:1;">
+              <div style="font-weight:600;font-size:0.92rem;">{{ ci.item.name }}</div>
+              <div style="font-size:0.82rem;color:var(--color-brown-600);">Qty: {{ ci.qty }}</div>
+            </div>
+            <div style="font-weight:600;color:var(--color-orange);">₹{{ "%.2f"|format(ci.subtotal) }}</div>
+          </div>
+          {% endfor %}
+          <div class="checkout-total">
+            <span>Total</span>
+            <span style="color:var(--color-orange);">₹{{ "%.2f"|format(total) }}</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Payment Panel -->
+      <div id="checkout-action-panel">
+        <div class="checkout-panel">
+          <h2 style="font-family:var(--font-display);font-size:1.2rem;margin-bottom:1rem;">Payment</h2>
+          <div style="padding:1rem;background:var(--color-cream-100);border-radius:var(--radius-md);margin-bottom:1.5rem;font-size:0.85rem;color:var(--color-brown-600);">
+            🔒 Payments are processed securely via Razorpay. We never store your card details.
+          </div>
+          <div style="display:flex;justify-content:space-between;font-size:0.9rem;margin-bottom:1.5rem;padding-bottom:1rem;border-bottom:1px solid var(--color-cream-200);">
+            <span>Order Total</span>
+            <strong>₹{{ "%.2f"|format(total) }}</strong>
+          </div>
+          <div id="checkout-error" style="display:none;padding:0.75rem;background:#f8d7da;color:#721c24;border-radius:var(--radius-md);margin-bottom:1rem;font-size:0.88rem;"></div>
+          <button class="btn btn-primary" id="checkout-btn" style="width:100%;justify-content:center;">
+            🔒 Pay Securely
+          </button>
+          <p style="font-size:0.78rem;color:var(--color-brown-600);text-align:center;margin-top:0.75rem;">
+            By proceeding, you agree to our terms of service.
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+<script src="{{ url_for('static', filename='js/checkout.js') }}"></script>
+{% endblock %}

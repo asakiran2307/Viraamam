@@ -1,0 +1,131 @@
+{% extends "admin/base_admin.html" %}
+{% block title %}Advertisements — Viraamam Admin{% endblock %}
+
+{% block content %}
+<h1 class="admin-page-title">Advertisements</h1>
+<p class="admin-page-subtitle">Manage the auto-scrolling banner carousel on the homepage.</p>
+
+<!-- Add Ad Form -->
+<div class="admin-card" style="margin-bottom:2rem;">
+  <div class="admin-card-header">
+    <span class="admin-card-title">+ Add New Advertisement</span>
+  </div>
+  <div style="padding:1.5rem;">
+    <form method="POST" action="{{ url_for('admin.add_advertisement') }}" enctype="multipart/form-data" novalidate>
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.2rem;">
+        <div class="form-group" style="grid-column:1/-1;">
+          <label class="form-label" for="ad-title">Title *</label>
+          <input type="text" id="ad-title" name="title" class="form-control" required placeholder="e.g. Summer Special Offer" />
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="ad-item">Link to Item (optional)</label>
+          <select id="ad-item" name="item_id" class="form-control">
+            <option value="">-- No linked item --</option>
+            {% for item in items %}
+            <option value="{{ item.id }}">{{ item.name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="ad-order">Display Order</label>
+          <input type="number" id="ad-order" name="display_order" class="form-control" min="0" value="0" />
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="ad-start">Start Date *</label>
+          <input type="date" id="ad-start" name="start_date" class="form-control" value="{{ today }}" required />
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="ad-end">End Date *</label>
+          <input type="date" id="ad-end" name="end_date" class="form-control" value="2099-12-31" required />
+        </div>
+
+        <div class="form-group" style="grid-column:1/-1;">
+          <label class="form-label">Banner Image *</label>
+          <div class="img-upload-wrap">
+            <img id="ad-preview" class="img-preview" src="" alt="Preview" />
+            <label class="upload-placeholder" data-for="ad-image" style="cursor:pointer;">
+              <div class="upload-icon">🖼️</div>
+              <div class="upload-text">Click to upload banner<br><small>Recommended: 1440×320px or wider</small></div>
+            </label>
+            <input type="file" id="ad-image" name="image" accept="image/*" data-preview="ad-preview" style="display:none;" />
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label style="display:flex;align-items:center;gap:0.75rem;cursor:pointer;">
+            <input type="checkbox" name="is_active" checked style="width:18px;height:18px;accent-color:var(--color-orange);" />
+            <span class="form-label" style="margin:0;">Active</span>
+          </label>
+        </div>
+      </div>
+      <button type="submit" class="btn btn-primary">+ Add Advertisement</button>
+    </form>
+  </div>
+</div>
+
+<!-- Ads List -->
+<div class="admin-card">
+  <div class="admin-card-header">
+    <span class="admin-card-title">All Advertisements ({{ ads|length }})</span>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Image</th>
+          <th>Title</th>
+          <th>Linked Item</th>
+          <th>Order</th>
+          <th>Active Window</th>
+          <th>Status</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for ad in ads %}
+        <tr>
+          <td>
+            {% if ad.image_data %}
+            <img src="{{ url_for('admin.ad_image', ad_id=ad.id) }}" alt="{{ ad.title }}"
+                 style="width:80px;height:40px;object-fit:cover;border-radius:4px;" />
+            {% else %}
+            <div style="width:80px;height:40px;background:var(--color-cream-200);border-radius:4px;display:flex;align-items:center;justify-content:center;">🖼️</div>
+            {% endif %}
+          </td>
+          <td><strong>{{ ad.title }}</strong></td>
+          <td>{{ ad.item.name if ad.item else '—' }}</td>
+          <td>{{ ad.display_order }}</td>
+          <td style="font-size:0.82rem;">{{ ad.start_date.strftime('%d %b') }} → {{ ad.end_date.strftime('%d %b %Y') }}</td>
+          <td>
+            <button
+              data-toggle-url="{{ url_for('admin.toggle_advertisement', ad_id=ad.id) }}"
+              style="background:none;border:none;cursor:pointer;padding:0;"
+            >
+              <div class="toggle-track {% if ad.is_active %}on{% endif %}">
+                <div class="toggle-thumb"></div>
+              </div>
+            </button>
+          </td>
+          <td>
+            <form method="POST" action="{{ url_for('admin.delete_advertisement', ad_id=ad.id) }}"
+                  data-confirm="Delete advertisement '{{ ad.title }}'?">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+              <button type="submit" class="btn btn-danger btn-sm">Delete</button>
+            </form>
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="7" style="text-align:center;padding:2rem;color:var(--color-brown-600);">No advertisements yet.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}{% endblock %}
