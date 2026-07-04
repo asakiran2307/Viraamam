@@ -40,7 +40,7 @@ def create_app(config_name: str | None = None) -> Flask:
                 "style-src": ["'self'", "fonts.googleapis.com", "cdn.jsdelivr.net", "'unsafe-inline'"],
                 "font-src": ["'self'", "fonts.gstatic.com"],
                 "img-src": ["'self'", "data:"],
-                "frame-src": ["api.razorpay.com"],
+                "frame-src": ["api.razorpay.com", "www.google.com"],
             },
             force_https=False,           # Vercel enforces HTTPS at the edge
             strict_transport_security=True,
