@@ -1,6 +1,6 @@
-"""Checkout routes — handles placing orders directly without Razorpay."""
+"""Checkout routes — handles placing orders without marking them paid."""
 import logging
-from flask import Blueprint, request, jsonify, current_app
+from flask import Blueprint, jsonify, current_app
 from flask_login import login_required, current_user
 from ..extensions import db
 from ..models.order import Order
@@ -13,49 +13,67 @@ payments_bp = Blueprint("payments", __name__)
 
 def _notify_admin(order):
     try:
-        items_summary = "\n".join([f"- {oi.quantity}x {oi.item.name}" for oi in order.order_items])
-        send_telegram_notification(order.id, float(order.total_amount), items_summary)
-    except Exception as e:
-        current_app.logger.error(f"Failed to format/send telegram notification: {e}")
+        items_summary = "\n".join(
+            [f"- {oi.quantity}x {oi.item.name}" for oi in order.order_items]
+        )
+        send_telegram_notification(
+            order.id, float(order.total_amount), items_summary
+        )
+    except Exception:
+        current_app.logger.exception(
+            "Failed to send Telegram notification for order %s", order.id
+        )
 
 
 @payments_bp.route("/place-order", methods=["POST"])
 @login_required
 def place_order():
-    """Place the order directly, convert cart reservations to order items."""
+    """Create an order from the user's reserved cart.
+
+    This endpoint does not verify or collect a payment, so the order must remain
+    pending. A verified payment callback/webhook is the only flow that should
+    transition an order to 'paid'.
+    """
     cart_items = CartItem.query.filter_by(user_id=current_user.id).all()
-    
-    # Filter out expired items just in case cleanup hasn't caught them
     valid_cart_items = [ci for ci in cart_items if not ci.is_expired]
-    
+
     if not valid_cart_items:
         return jsonify(error="Your cart is empty or reservations expired"), 400
 
-    total_amount = sum([float(ci.item.price) * ci.quantity for ci in valid_cart_items])
-
-    # Create the order
-    order = Order(
-        user_id=current_user.id,
-        total_amount=total_amount,
-        status="paid"  # Direct checkout bypasses payment for now
+    # Compute totals from current database prices, never client-supplied values.
+    total_amount = sum(
+        (ci.item.price * ci.quantity for ci in valid_cart_items),
+        start=0,
     )
-    db.session.add(order)
-    db.session.flush()  # get order.id
 
-    # Create OrderItems
-    for ci in valid_cart_items:
-        oi = OrderItem(
-            order_id=order.id,
-            item_id=ci.item_id,
-            quantity=ci.quantity,
-            price_at_purchase=ci.item.price
+    try:
+        order = Order(
+            user_id=current_user.id,
+            total_amount=total_amount,
+            status="pending",
         )
-        db.session.add(oi)
-        db.session.delete(ci)  # Delete cart item (stock is already decremented!)
-        
-    db.session.commit()
+        db.session.add(order)
+        db.session.flush()
 
-    # Send telegram notification
+        for ci in valid_cart_items:
+            db.session.add(
+                OrderItem(
+                    order_id=order.id,
+                    item_id=ci.item_id,
+                    quantity=ci.quantity,
+                    price_at_purchase=ci.item.price,
+                )
+            )
+            # Stock was reserved when the item was added to the cart.
+            db.session.delete(ci)
+
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+        current_app.logger.exception(
+            "Failed to create order for user %s", current_user.id
+        )
+        return jsonify(error="Unable to place your order. Please try again."), 500
+
     _notify_admin(order)
-
-    return jsonify(success=True, order_id=order.id)
+    return jsonify(success=True, order_id=order.id, status=order.status), 201
