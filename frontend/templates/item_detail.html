@@ -122,13 +122,6 @@ function updateQtyDisplay() {
 minusBtn?.addEventListener('click', () => { if (qty > 1) { qty--; updateQtyDisplay(); } });
 plusBtn?.addEventListener('click',  () => { if (qty < maxQty) { qty++; updateQtyDisplay(); } });
 
-// Override data-add-to-cart to use qty stepper value
-document.getElementById('add-to-cart-main')?.addEventListener('click', async function() {
-  this.disabled = true;
-  await Cart.addItem('{{ item.id }}', qty);
-  this.disabled = false;
-});
-
 updateQtyDisplay();
 </script>
 {% endblock %}
