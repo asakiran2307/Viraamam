@@ -1,4 +1,6 @@
 """Authentication routes — register, login, logout."""
+from urllib.parse import urlsplit
+
 import bcrypt
 from flask import Blueprint, render_template, redirect, url_for, flash, request, session
 from flask_login import login_user, logout_user, login_required, current_user
@@ -6,6 +8,16 @@ from ..extensions import db, limiter
 from ..models.user import User
 
 auth_bp = Blueprint("auth", __name__)
+
+
+def _safe_next_url(target):
+    """Only allow relative same-site redirects after login."""
+    if not target:
+        return None
+    parsed = urlsplit(target)
+    if parsed.scheme or parsed.netloc or not target.startswith("/") or target.startswith("//"):
+        return None
+    return target
 
 
 @auth_bp.route("/register", methods=["GET", "POST"])
@@ -27,7 +39,7 @@ def register():
             return render_template("auth/register.html")
 
         if User.query.filter_by(email=email).first():
-            flash("Invalid credentials.", "danger")  # Don't reveal email exists
+            flash("Invalid credentials.", "danger")
             return render_template("auth/register.html")
 
         pw_hash = bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt(rounds=12))
@@ -49,19 +61,24 @@ def login():
     if request.method == "POST":
         email = request.form.get("email", "").strip().lower()
         password = request.form.get("password", "")
-        remember = request.form.get("remember", False)
+        remember = request.form.get("remember") == "on"
 
         user = User.query.filter_by(email=email).first()
-        if not user or not bcrypt.checkpw(password.encode("utf-8"), user.password_hash.encode("utf-8")):
+        password_ok = False
+        if user and user.password_hash:
+            try:
+                password_ok = bcrypt.checkpw(
+                    password.encode("utf-8"), user.password_hash.encode("utf-8")
+                )
+            except (ValueError, TypeError):
+                password_ok = False
+
+        if not user or not password_ok or not user.is_active:
             flash("Invalid credentials.", "danger")
             return render_template("auth/login.html")
 
-        if not user.is_active:
-            flash("Invalid credentials.", "danger")
-            return render_template("auth/login.html")
-
-        login_user(user, remember=bool(remember))
-        next_page = request.args.get("next")
+        login_user(user, remember=remember)
+        next_page = _safe_next_url(request.args.get("next"))
         flash(f"Welcome back, {user.name}!", "success")
 
         if user.is_admin:
