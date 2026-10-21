@@ -47,16 +47,24 @@ const Cart = (() => {
   }
 
   async function addItem(itemId, qty = 1) {
-    const res = await fetch('/cart/add', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Requested-With': 'XMLHttpRequest',
-        'X-CSRFToken': getCsrf(),
-      },
-      body: JSON.stringify({ item_id: itemId, qty }),
-    });
-    const data = await res.json();
+    let data;
+    try {
+      const res = await fetch('/cart/add', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Requested-With': 'XMLHttpRequest',
+          'X-CSRFToken': getCsrf(),
+        },
+        body: JSON.stringify({ item_id: itemId, qty }),
+      });
+      data = await res.json();
+      if (!res.ok && data.success === undefined) {
+        data = { success: false, message: 'Could not update your cart. Please try again.' };
+      }
+    } catch (_) {
+      data = { success: false, message: 'Network error. Please check your connection and try again.' };
+    }
     if (data.success) {
       showToast(data.message || 'Added to cart!', 'success');
       updateBadge(data.cart_count);
@@ -134,10 +142,13 @@ const Cart = (() => {
         e.preventDefault();
         const itemId = btn.dataset.addToCart;
         const qtyEl = document.getElementById('item-qty');
-        const qty = qtyEl ? parseInt(qtyEl.value) : 1;
+        const qty = qtyEl ? (parseInt(qtyEl.value || qtyEl.textContent, 10) || 1) : 1;
         btn.disabled = true;
-        await addItem(itemId, qty);
-        btn.disabled = false;
+        try {
+          await addItem(itemId, qty);
+        } finally {
+          btn.disabled = false;
+        }
       });
     });
 
